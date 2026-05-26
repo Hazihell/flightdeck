@@ -1,0 +1,44 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`issue prompts human output matches snapshot sections for plan mode 1`] = `"{"ok":true,"command":"issue prompt","data":{"mode":"plan","publicId":"PRM-1","prompt":"## Project context\\n\\n- Project key: PRM\\n- Project name: Prompts\\n\\n### Project instructions\\n\\nUse Bun and keep tests green.\\n\\n## Repository path\\n\\n/var/folders/sy/twlys6wd1694ld6khj480_p80000gn/T/flightdeck-test-JCqcqK/home/repo\\n\\n## Issue body\\n\\n## What to build\\n\\nSnap\\n\\n## Blocker context\\n\\n- Unblocked: yes\\n- Dependency blockers: none\\n\\n## Mode instructions\\n\\nMode: plan\\n\\nCreate an unambiguous implementation plan for issue PRM-1 without modifying product code in the registered repository. The plan should be detailed enough for another agent to implement.\\n\\nProduce a markdown plan with clear steps, files to touch, risks, and test strategy.\\nDo not write plans into the project repository — attach them with \`deck issue attach-plan\`.\\n\\n## Required Flightdeck commands\\n\\ndeck issue attach-plan PRM-1 --body <PLAN_MARKDOWN_OR_PATH>\\ndeck issue move PRM-1 --status backlog\\ndeck issue comment PRM-1 --body \\"<planning notes>\\""}}"`;
+
+exports[`issue prompts prompt text matches snapshot sections for plan mode 1`] = `
+"## Project context
+
+- Project key: PRM
+- Project name: Prompts
+
+### Project instructions
+
+Use Bun and keep tests green.
+
+## Repository path
+
+<REPO_PATH>
+
+## Issue body
+
+## What to build
+
+Snap
+
+## Blocker context
+
+- Unblocked: yes
+- Dependency blockers: none
+
+## Mode instructions
+
+Mode: plan
+
+Create an unambiguous implementation plan for issue PRM-1 without modifying product code in the registered repository. The plan should be detailed enough for another agent to implement.
+
+Produce a markdown plan with clear steps, files to touch, risks, and test strategy.
+Do not write plans into the project repository — attach them with \`deck issue attach-plan\`.
+
+## Required Flightdeck commands
+
+deck issue attach-plan PRM-1 --body <PLAN_MARKDOWN_OR_PATH>
+deck issue move PRM-1 --status backlog
+deck issue comment PRM-1 --body "<planning notes>""
+`;

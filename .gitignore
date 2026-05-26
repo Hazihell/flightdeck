@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local Flightdeck data (if created inside the repo during manual testing)
+Flightdeck/
+.flightdeck/
+
+# Editor and OS
+.idea/
+.vscode/
+*.swp
+*.swo
