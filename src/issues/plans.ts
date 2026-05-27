@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
 import {
   findDocumentById,
@@ -9,7 +9,12 @@ import {
   upsertDocument,
   writeMarkdownDocument,
 } from "../documents/repository.ts";
-import { findIssueByPublicId, resolveBodyInput, updateIssue, IssueRepositoryError } from "./repository.ts";
+import {
+  findIssueByPublicId,
+  IssueRepositoryError,
+  resolveBodyInput,
+  updateIssue,
+} from "./repository.ts";
 import type { Issue, PlanStatus } from "./types.ts";
 
 export class PlanError extends Error {

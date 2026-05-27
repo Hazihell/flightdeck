@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { parseIssueMarkdown } from "./markdown.ts";
 
 const FULL_BODY = `## Parent
@@ -59,9 +60,7 @@ Ship it.
 Waiting on vendor API credentials
 `);
     expect(parsed.dependencyPublicIds).toEqual([]);
-    expect(parsed.manualBlockerFromMarkdown).toBe(
-      "Waiting on vendor API credentials",
-    );
+    expect(parsed.manualBlockerFromMarkdown).toBe("Waiting on vendor API credentials");
   });
 
   test("extracts multiple dependency references", () => {

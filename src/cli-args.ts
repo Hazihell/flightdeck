@@ -64,17 +64,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return { command, flags, positional };
 }
 
-export function flagString(
-  flags: Map<string, string | boolean>,
-  name: string,
-): string | undefined {
+export function flagString(flags: Map<string, string | boolean>, name: string): string | undefined {
   const value = flags.get(name);
   return typeof value === "string" ? value : undefined;
 }
 
-export function hasFlag(
-  flags: Map<string, string | boolean>,
-  name: string,
-): boolean {
+export function hasFlag(flags: Map<string, string | boolean>, name: string): boolean {
   return flags.has(name);
 }

@@ -1,8 +1,11 @@
-import { mkdtemp } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { initFlightdeck } from "../init.ts";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { runCli } from "../cli.ts";
+import { initFlightdeck } from "../init.ts";
 
 export type IsolatedHome = {
   home: string;
@@ -12,7 +15,7 @@ export type IsolatedHome = {
 
 /** Creates an isolated temporary Flightdeck Home for tests. */
 export async function createIsolatedFlightdeckHome(): Promise<IsolatedHome> {
-  const parent = await mkdtemp(join(tmpdir(), "flightdeck-test-"));
+  const parent = await realpath(await mkdtemp(join(tmpdir(), "flightdeck-test-")));
   const home = join(parent, "home");
   const platformHome = join(parent, "platform");
   const env: NodeJS.ProcessEnv = {
@@ -29,10 +32,11 @@ export async function setupInitializedHome(): Promise<IsolatedHome> {
   return isolated;
 }
 
-const REPO_ROOT = join(import.meta.dir, "../..");
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const BUN_EXECUTABLE = process.versions.bun ? process.execPath : "bun";
 
 export function deckSpawnArgs(argv: string[]): string[] {
-  return [process.execPath, "run", join(REPO_ROOT, "src", "cli.ts"), ...argv];
+  return [BUN_EXECUTABLE, "run", join(REPO_ROOT, "src", "cli.ts"), ...argv];
 }
 
 export function deckExecutable(): string[] {
@@ -44,16 +48,15 @@ export function spawnDeck(
   argv: string[],
   env: NodeJS.ProcessEnv,
 ): { exitCode: number; stdout: string; stderr: string } {
-  const proc = Bun.spawnSync(deckSpawnArgs(argv), {
+  const proc = spawnSync(deckSpawnArgs(argv)[0]!, deckSpawnArgs(argv).slice(1), {
     env,
     cwd: REPO_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "utf8",
   });
   return {
-    exitCode: proc.exitCode,
-    stdout: proc.stdout.toString(),
-    stderr: proc.stderr.toString(),
+    exitCode: proc.status ?? 1,
+    stdout: proc.stdout,
+    stderr: proc.stderr,
   };
 }
 
@@ -70,9 +73,7 @@ export type DeckJsonResponse<T = Record<string, unknown>> =
   | { ok: false; command?: string; error: { code: string; message: string } };
 
 /** Parses the last JSON line from CLI stdout. */
-export function parseDeckJson<T = Record<string, unknown>>(
-  output: string,
-): DeckJsonResponse<T> {
+export function parseDeckJson<T = Record<string, unknown>>(output: string): DeckJsonResponse<T> {
   const jsonLine = output
     .trim()
     .split("\n")

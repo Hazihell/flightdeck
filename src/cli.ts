@@ -1,12 +1,10 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
-import {
-  closeDatabase,
-  openDatabase,
-} from "./db/client.ts";
+
 import { flagString, hasFlag, parseArgs } from "./cli-args.ts";
-import { initFlightdeck } from "./init.ts";
+import { closeDatabase, openDatabase } from "./db/client.ts";
 import { resolveFlightdeckHome } from "./home.ts";
+import { initFlightdeck } from "./init.ts";
 import {
   runIssueApprovePlan,
   runIssueAttachPlan,
@@ -65,7 +63,8 @@ type CliOutput =
 function printHumanData(data: Record<string, unknown>): void {
   if (Array.isArray(data.issues)) {
     const issues = data.issues as Array<Record<string, unknown>>;
-    console.log(`count: ${String(data.count ?? issues.length)}`);
+    const count = typeof data.count === "number" ? data.count : issues.length;
+    console.log(`count: ${count}`);
     for (const issue of issues) {
       console.log(
         `${String(issue.publicId)}  ${String(issue.title)}  [${String(issue.workflowStatus)}]`,
@@ -76,8 +75,8 @@ function printHumanData(data: Record<string, unknown>): void {
 
   if (data.issue === null) {
     console.log("issue: (none)");
-    if (data.mode) {
-      console.log(`mode: ${String(data.mode)}`);
+    if (typeof data.mode === "string") {
+      console.log(`mode: ${data.mode}`);
     }
     return;
   }
@@ -95,22 +94,20 @@ function printHumanData(data: Record<string, unknown>): void {
     console.log(`complexity: ${String(data.complexity)}`);
     console.log(`planStatus: ${String(data.planStatus)}`);
     console.log(`unblocked: ${String(data.unblocked)}`);
-    if (data.manualBlocker) {
-      console.log(`manualBlocker: ${String(data.manualBlocker)}`);
+    if (typeof data.manualBlocker === "string") {
+      console.log(`manualBlocker: ${data.manualBlocker}`);
     }
-    const blockers = data.dependencyBlockers as
-      | Array<Record<string, unknown>>
-      | undefined;
+    const blockers = data.dependencyBlockers as Array<Record<string, unknown>> | undefined;
     if (blockers && blockers.length > 0) {
       console.log("dependencyBlockers:");
       for (const blocker of blockers) {
-        console.log(
-          `  ${String(blocker.publicId)} (${String(blocker.workflowStatus)})`,
-        );
+        console.log(`  ${String(blocker.publicId)} (${String(blocker.workflowStatus)})`);
       }
     }
     console.log("");
-    console.log(String(data.bodyMarkdown));
+    if (typeof data.bodyMarkdown === "string") {
+      console.log(data.bodyMarkdown);
+    }
     return;
   }
 
@@ -123,10 +120,7 @@ function shouldEmitJson(flags: Map<string, string | boolean>): boolean {
   return hasFlag(flags, "json") || !process.stdout.isTTY;
 }
 
-function printOutput(
-  output: CliOutput,
-  flags: Map<string, string | boolean>,
-): void {
+function printOutput(output: CliOutput, flags: Map<string, string | boolean>): void {
   if (shouldEmitJson(flags)) {
     console.log(JSON.stringify(output));
     return;
@@ -197,12 +191,7 @@ export async function runCli(
       }
     }
 
-    if (
-      root === "project" &&
-      sub === "path" &&
-      leaf === "add" &&
-      parsed.command.length === 3
-    ) {
+    if (root === "project" && sub === "path" && leaf === "add" && parsed.command.length === 3) {
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runProjectPathAdd(db, {
@@ -265,9 +254,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "show" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueShow(db, publicId);
@@ -283,9 +270,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "update" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueUpdate(db, {
@@ -309,9 +294,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "block-by" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueBlockBy(db, {
@@ -330,9 +313,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "unblock-by" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueUnblockBy(db, {
@@ -369,9 +350,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "move" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueMove(db, {
@@ -395,9 +374,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "comment" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueComment(db, {
@@ -414,15 +391,9 @@ export async function runCli(
       }
     }
 
-    if (
-      root === "issue" &&
-      sub === "attach-plan" &&
-      parsed.command.length >= 2
-    ) {
+    if (root === "issue" && sub === "attach-plan" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const home = resolveFlightdeckHome(env, platformHome);
       const db = openDatabase(home);
       try {
@@ -440,15 +411,9 @@ export async function runCli(
       }
     }
 
-    if (
-      root === "issue" &&
-      sub === "approve-plan" &&
-      parsed.command.length >= 2
-    ) {
+    if (root === "issue" && sub === "approve-plan" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueApprovePlan(db, publicId);
@@ -462,15 +427,9 @@ export async function runCli(
       }
     }
 
-    if (
-      root === "issue" &&
-      sub === "request-plan-changes" &&
-      parsed.command.length >= 2
-    ) {
+    if (root === "issue" && sub === "request-plan-changes" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const db = openDatabase(resolveFlightdeckHome(env, platformHome));
       try {
         const result = runIssueRequestPlanChanges(db, {
@@ -497,9 +456,7 @@ export async function runCli(
 
     if (root === "issue" && sub === "prompt" && parsed.command.length >= 2) {
       const publicId =
-        parsed.command.length >= 3
-          ? (parsed.command[2] ?? "")
-          : (parsed.positional[0] ?? "");
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
       const home = resolveFlightdeckHome(env, platformHome);
       const db = openDatabase(home);
       try {

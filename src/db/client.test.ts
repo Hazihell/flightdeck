@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+
+import { flightdeckDatabasePath } from "../home.ts";
+import { initFlightdeck } from "../init.ts";
+import { createIsolatedFlightdeckHome } from "../testing/helpers.ts";
 import {
   closeDatabase,
   expectedSchemaVersion,
@@ -7,9 +11,6 @@ import {
   migrate,
   openDatabase,
 } from "./client.ts";
-import { flightdeckDatabasePath } from "../home.ts";
-import { initFlightdeck } from "../init.ts";
-import { createIsolatedFlightdeckHome } from "../testing/helpers.ts";
 
 describe("database migrations", () => {
   test("applies migrations once and records schema version", async () => {

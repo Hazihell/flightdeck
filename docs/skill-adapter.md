@@ -56,16 +56,16 @@ deck issue create \
 
 ### Flags skills should set
 
-| Flag | Purpose |
-|------|---------|
-| `--project` | Project key (uppercased by Flightdeck). Omit only when cwd is under a registered path. |
-| `--title` | Short issue title. |
-| `--body` | Markdown string or path to a `.md` file with the sections above. |
-| `--triage-role` | Usually `ready-for-agent` for issues intended for agent pickup. |
-| `--complexity` | `simple` or `needs-plan`. Complex slices should use `needs-plan`. |
-| `--blocked-by` | Optional dependency public ID (for example `OLA-8`). |
-| `--manual-blocker` | Optional external blocker text when there is no dependency issue. |
-| `--json` | Machine-readable output with `publicId` (for example `OLA-12`). |
+| Flag               | Purpose                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `--project`        | Project key (uppercased by Flightdeck). Omit only when cwd is under a registered path. |
+| `--title`          | Short issue title.                                                                     |
+| `--body`           | Markdown string or path to a `.md` file with the sections above.                       |
+| `--triage-role`    | Usually `ready-for-agent` for issues intended for agent pickup.                        |
+| `--complexity`     | `simple` or `needs-plan`. Complex slices should use `needs-plan`.                      |
+| `--blocked-by`     | Optional dependency public ID (for example `OLA-8`).                                   |
+| `--manual-blocker` | Optional external blocker text when there is no dependency issue.                      |
+| `--json`           | Machine-readable output with `publicId` (for example `OLA-12`).                        |
 
 ### Successful JSON response
 

@@ -1,9 +1,10 @@
 import { Database } from "bun:sqlite";
+
 import { flightdeckDatabasePath } from "../home.ts";
 import { nowIso } from "../time.ts";
 import { MIGRATIONS, SCHEMA_VERSION } from "./schema.ts";
 
-export type SqliteDatabase = Database;
+export type { Database };
 
 export function openDatabase(home: string): Database {
   const path = flightdeckDatabasePath(home);
@@ -23,9 +24,7 @@ export function getAppliedMigrationVersion(db: Database): number {
   }
 
   const row = db
-    .query<{ version: number | null }, []>(
-      "SELECT MAX(version) AS version FROM schema_migrations",
-    )
+    .query<{ version: number | null }, []>("SELECT MAX(version) AS version FROM schema_migrations")
     .get();
   return row?.version ?? 0;
 }
@@ -41,11 +40,10 @@ export function migrate(db: Database): number {
     db.exec("BEGIN;");
     try {
       db.exec(migration.sql);
-      db
-        .query(
-          "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-        )
-        .run(migration.version, nowIso());
+      db.query("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(
+        migration.version,
+        nowIso(),
+      );
       db.exec("COMMIT;");
       applied = migration.version;
     } catch (error) {

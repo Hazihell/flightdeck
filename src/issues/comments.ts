@@ -1,7 +1,8 @@
-import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+
+import type { Database } from "../db/client.ts";
 import { nowIso } from "../time.ts";
-import { findIssueByPublicId, resolveBodyInput, IssueRepositoryError } from "./repository.ts";
+import { findIssueByPublicId, IssueRepositoryError, resolveBodyInput } from "./repository.ts";
 import type { IssueComment } from "./types.ts";
 
 type CommentRow = {
@@ -22,11 +23,7 @@ function mapComment(row: CommentRow): IssueComment {
   };
 }
 
-export function addIssueComment(
-  db: Database,
-  publicId: string,
-  body: string,
-): IssueComment {
+export function addIssueComment(db: Database, publicId: string, body: string): IssueComment {
   const issue = findIssueByPublicId(db, publicId);
   if (!issue) {
     throw new IssueRepositoryError("issue_not_found", `Issue not found: ${publicId}`);
@@ -45,13 +42,7 @@ export function addIssueComment(
   db.query(
     `INSERT INTO issue_comments (id, issue_id, body_markdown, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(
-    comment.id,
-    comment.issueId,
-    comment.bodyMarkdown,
-    comment.createdAt,
-    comment.updatedAt,
-  );
+  ).run(comment.id, comment.issueId, comment.bodyMarkdown, comment.createdAt, comment.updatedAt);
 
   return comment;
 }

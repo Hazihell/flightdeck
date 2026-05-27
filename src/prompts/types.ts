@@ -1,11 +1,6 @@
 import type { QueueMode } from "../issues/types.ts";
 
-export const PROMPT_MODES = [
-  "plan",
-  "implement",
-  "review",
-  "address-review",
-] as const;
+export const PROMPT_MODES = ["plan", "implement", "review", "address-review"] as const;
 
 export type PromptMode = (typeof PROMPT_MODES)[number];
 

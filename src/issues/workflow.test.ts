@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  closeDatabase,
-  openDatabase,
-} from "../db/client.ts";
+
+import { closeDatabase, openDatabase } from "../db/client.ts";
 import { findIssueByPublicId, listIssueComments } from "../index.ts";
 import { runDeck, setupInitializedHome } from "../testing/helpers.ts";
 
@@ -11,10 +10,7 @@ describe("workflow commands", () => {
   test("moves issue status and stores validation and git metadata", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "WF", "--name", "Workflow", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "WF", "--name", "Workflow", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -70,10 +66,7 @@ describe("workflow commands", () => {
 
   test("rejects unknown workflow status", async () => {
     const isolated = await setupInitializedHome();
-    await runDeck(
-      ["project", "add", "--key", "BAD", "--name", "Bad", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "BAD", "--name", "Bad", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -90,20 +83,14 @@ describe("workflow commands", () => {
     );
 
     expect(
-      await runDeck(
-        ["issue", "move", "BAD-1", "--status", "invalid-status", "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "move", "BAD-1", "--status", "invalid-status", "--json"], isolated),
     ).toBe(1);
   });
 
   test("perserves markdown comment bodies", async () => {
     const isolated = await setupInitializedHome();
     const { env, home } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "CM", "--name", "Comments", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "CM", "--name", "Comments", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -121,10 +108,7 @@ describe("workflow commands", () => {
 
     const commentBody = "## Review\n\n- [ ] Fix **edge** case\n\n```ts\nconst x = 1;\n```";
     expect(
-      await runDeck(
-        ["issue", "comment", "CM-1", "--body", commentBody, "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "comment", "CM-1", "--body", commentBody, "--json"], isolated),
     ).toBe(0);
 
     const db = openDatabase(env.FLIGHTDECK_HOME!);
@@ -138,12 +122,9 @@ describe("workflow commands", () => {
     }
 
     const bodyPath = join(home, "comment.md");
-    await Bun.write(bodyPath, "From **file** path");
+    await writeFile(bodyPath, "From **file** path");
     expect(
-      await runDeck(
-        ["issue", "comment", "CM-1", "--body", bodyPath, "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "comment", "CM-1", "--body", bodyPath, "--json"], isolated),
     ).toBe(0);
 
     const db2 = openDatabase(env.FLIGHTDECK_HOME!);

@@ -1,5 +1,6 @@
-import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+
+import type { Database } from "../db/client.ts";
 import { nowIso } from "../time.ts";
 import { normalizePath, pathMatchesPrefix } from "./paths.ts";
 import {
@@ -109,9 +110,7 @@ export function findProjectByKey(db: Database, key: string): Project | null {
 }
 
 export function findProjectById(db: Database, id: string): Project | null {
-  const row = db
-    .query<ProjectRow, [string]>("SELECT * FROM projects WHERE id = ?")
-    .get(id);
+  const row = db.query<ProjectRow, [string]>("SELECT * FROM projects WHERE id = ?").get(id);
   return row ? mapProject(row) : null;
 }
 
@@ -180,16 +179,11 @@ export function listProjectPaths(db: Database, projectId: string): ProjectPath[]
 }
 
 export function listAllProjectPaths(db: Database): ProjectPath[] {
-  const rows = db
-    .query<ProjectPathRow, []>("SELECT * FROM project_paths ORDER BY path ASC")
-    .all();
+  const rows = db.query<ProjectPathRow, []>("SELECT * FROM project_paths ORDER BY path ASC").all();
   return rows.map(mapProjectPath);
 }
 
-export function inferProjectFromCwd(
-  db: Database,
-  cwd: string,
-): InferProjectResult {
+export function inferProjectFromCwd(db: Database, cwd: string): InferProjectResult {
   const paths = listAllProjectPaths(db);
   let best: { path: ProjectPath; length: number } | null = null;
 
@@ -227,10 +221,7 @@ export function inferProjectFromCwd(
   };
 }
 
-export type ProjectRepositoryErrorCode =
-  | "duplicate_key"
-  | "duplicate_path"
-  | "project_not_found";
+export type ProjectRepositoryErrorCode = "duplicate_key" | "duplicate_path" | "project_not_found";
 
 export class ProjectRepositoryError extends Error {
   readonly code: ProjectRepositoryErrorCode;

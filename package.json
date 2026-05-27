@@ -1,27 +1,32 @@
 {
   "name": "flightdeck",
   "version": "0.1.0",
-  "description": "Local-only CLI issue tracker for agent workflows across multiple projects",
   "private": true,
-  "type": "module",
+  "description": "Local-only CLI issue tracker for agent workflows across multiple projects",
   "license": "MIT",
   "bin": {
     "deck": "./src/cli.ts"
   },
+  "type": "module",
   "scripts": {
+    "deck": "bun src/cli.ts",
     "test": "bun test",
     "smoke": "bun test src/e2e.test.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "oxlint src",
+    "fmt": "oxfmt --write README.md docs src",
+    "fmt:check": "oxfmt --check README.md docs src",
+    "check": "bun run typecheck && bun run lint && bun run fmt:check",
+    "build": "bun build src/cli.ts src/index.ts --outdir dist --target bun --format esm"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "typescript": "^5.8.3"
   },
   "engines": {
     "bun": ">=1.1.0"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.28.0",
-    "@types/bun": "latest",
-    "eslint": "^9.28.0",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.33.0"
-  }
+  "packageManager": "bun@1.3.14"
 }

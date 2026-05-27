@@ -23,21 +23,11 @@ export const COMPLEXITY_VALUES = ["simple", "needs-plan"] as const;
 
 export type Complexity = (typeof COMPLEXITY_VALUES)[number];
 
-export const PLAN_STATUSES = [
-  "none",
-  "attached",
-  "changes-requested",
-  "approved",
-] as const;
+export const PLAN_STATUSES = ["none", "attached", "changes-requested", "approved"] as const;
 
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
-export const QUEUE_MODES = [
-  "plan",
-  "implement",
-  "review",
-  "address-review",
-] as const;
+export const QUEUE_MODES = ["plan", "implement", "review", "address-review"] as const;
 
 export type QueueMode = (typeof QUEUE_MODES)[number];
 

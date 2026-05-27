@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "../db/client.ts";
 import { listBlockerIssues } from "./repository.ts";
 import type { Issue } from "./types.ts";
 

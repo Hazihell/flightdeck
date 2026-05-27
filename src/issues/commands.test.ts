@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  closeDatabase,
-  openDatabase,
-} from "../db/client.ts";
+import { join } from "node:path";
+
+import { closeDatabase, openDatabase } from "../db/client.ts";
 import {
   createIssue,
   findIssueByPublicId,
@@ -14,21 +12,14 @@ import {
   listIssues,
 } from "../index.ts";
 import { addProjectPath, createProject } from "../projects/repository.ts";
-import {
-  runDeck,
-  setupInitializedHome,
-  spawnDeckJson,
-} from "../testing/helpers.ts";
+import { runDeck, setupInitializedHome, spawnDeckJson } from "../testing/helpers.ts";
 
 describe("issue commands", () => {
   test("creates issues with per-project public IDs", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
     expect(
-      await runDeck(
-        ["project", "add", "--key", "OLA", "--name", "Ola", "--json"],
-        isolated,
-      ),
+      await runDeck(["project", "add", "--key", "OLA", "--name", "Ola", "--json"], isolated),
     ).toBe(0);
 
     expect(
@@ -123,10 +114,7 @@ describe("issue commands", () => {
   test("reads body from file path", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "DOC", "--name", "Docs", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "DOC", "--name", "Docs", "--json"], isolated);
 
     const bodyDir = await mkdtemp(join(tmpdir(), "flightdeck-body-"));
     const bodyPath = join(bodyDir, "issue.md");
@@ -376,16 +364,7 @@ Waiting on access`,
     const { exitCode: setCode, response: setResponse } = spawnDeckJson<{
       manualBlocker: string;
       unblocked: boolean;
-    }>(
-      [
-        "issue",
-        "update",
-        "UPD-1",
-        "--manual-blocker",
-        "Waiting on access",
-      ],
-      env,
-    );
+    }>(["issue", "update", "UPD-1", "--manual-blocker", "Waiting on access"], env);
     expect(setCode).toBe(0);
     expect(setResponse.ok).toBe(true);
     if (setResponse.ok) {
@@ -434,10 +413,7 @@ Waiting on access`,
     }
 
     expect(
-      await runDeck(
-        ["issue", "update", "QUE-1", "--clear-manual-blocker", "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "update", "QUE-1", "--clear-manual-blocker", "--json"], isolated),
     ).toBe(0);
 
     const unblocked = spawnDeckJson<{ issue: { publicId: string } | null }>(
@@ -470,14 +446,7 @@ Waiting on access`,
 
     expect(
       await runDeck(
-        [
-          "issue",
-          "update",
-          "TRI-1",
-          "--triage-role",
-          "ready-for-agent",
-          "--json",
-        ],
+        ["issue", "update", "TRI-1", "--triage-role", "ready-for-agent", "--json"],
         isolated,
       ),
     ).toBe(0);
@@ -540,10 +509,7 @@ None - can start immediately`,
   test("update body adds markdown dependencies but does not remove them", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "UPD", "--name", "Update deps", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "UPD", "--name", "Update deps", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -594,9 +560,7 @@ UPD-1`;
     }>(["issue", "update", "UPD-2", "--body", blockedBody, "--json"], env);
     expect(withBlocker.ok).toBe(true);
     if (withBlocker.ok) {
-      expect(withBlocker.data.dependencyBlockers.map((b) => b.publicId)).toEqual([
-        "UPD-1",
-      ]);
+      expect(withBlocker.data.dependencyBlockers.map((b) => b.publicId)).toEqual(["UPD-1"]);
     }
 
     const blockedPlan = spawnDeckJson<{ issue: { publicId: string } | null }>(
@@ -630,16 +594,11 @@ None - can start immediately`;
     }>(["issue", "update", "UPD-2", "--body", clearedBody, "--json"], env);
     expect(afterClear.ok).toBe(true);
     if (afterClear.ok) {
-      expect(afterClear.data.dependencyBlockers.map((b) => b.publicId)).toEqual([
-        "UPD-1",
-      ]);
+      expect(afterClear.data.dependencyBlockers.map((b) => b.publicId)).toEqual(["UPD-1"]);
     }
 
     expect(
-      await runDeck(
-        ["issue", "unblock-by", "UPD-2", "--issue", "UPD-1", "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "unblock-by", "UPD-2", "--issue", "UPD-1", "--json"], isolated),
     ).toBe(0);
 
     const { response: unblocked } = spawnDeckJson<{
@@ -663,10 +622,7 @@ None - can start immediately`;
   test("block-by and unblock-by manage dependency blockers", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "BLK2", "--name", "Block", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "BLK2", "--name", "Block", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -703,17 +659,7 @@ None - can start immediately`;
     );
 
     expect(
-      await runDeck(
-        [
-          "issue",
-          "block-by",
-          "BLK2-2",
-          "--issue",
-          "BLK2-1",
-          "--json",
-        ],
-        isolated,
-      ),
+      await runDeck(["issue", "block-by", "BLK2-2", "--issue", "BLK2-1", "--json"], isolated),
     ).toBe(0);
 
     const blocked = spawnDeckJson<{ issue: { publicId: string } | null }>(
@@ -726,10 +672,7 @@ None - can start immediately`;
     }
 
     expect(
-      await runDeck(
-        ["issue", "unblock-by", "BLK2-2", "--issue", "BLK2-1", "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "unblock-by", "BLK2-2", "--issue", "BLK2-1", "--json"], isolated),
     ).toBe(0);
 
     const unblocked = spawnDeckJson<{ issue: { publicId: string } | null }>(
@@ -741,14 +684,8 @@ None - can start immediately`;
       expect(unblocked.response.data.issue?.publicId).toBe("BLK2-2");
     }
 
-    await runDeck(
-      ["issue", "block-by", "BLK2-2", "--issue", "BLK2-1", "--json"],
-      isolated,
-    );
-    await runDeck(
-      ["issue", "move", "BLK2-1", "--status", "done", "--json"],
-      isolated,
-    );
+    await runDeck(["issue", "block-by", "BLK2-2", "--issue", "BLK2-1", "--json"], isolated);
+    await runDeck(["issue", "move", "BLK2-1", "--status", "done", "--json"], isolated);
 
     const unblockedByDone = spawnDeckJson<{ issue: { publicId: string } | null }>(
       ["issue", "next", "--mode", "implement", "--project", "BLK2"],
@@ -763,10 +700,7 @@ None - can start immediately`;
   test("records dependency via --blocked-by", async () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
-    await runDeck(
-      ["project", "add", "--key", "DEP", "--name", "Dep", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "DEP", "--name", "Dep", "--json"], isolated);
     await runDeck(
       [
         "issue",

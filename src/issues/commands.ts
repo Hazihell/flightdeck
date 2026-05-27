@@ -1,11 +1,19 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
+import type { CommandResult } from "../projects/commands.ts";
 import { findProjectById, inferProjectFromCwd, listProjectPaths } from "../projects/repository.ts";
 import { generatePrompt } from "../prompts/generator.ts";
 import { isPromptMode, type PromptMode } from "../prompts/types.ts";
 import { addIssueComment, listIssueComments } from "./comments.ts";
 import { parseIssueMarkdown } from "./markdown.ts";
-import { approveIssuePlan, attachIssuePlan, isImplementationPlanReady, readIssuePlan, PlanError } from "./plans.ts";
+import {
+  approveIssuePlan,
+  attachIssuePlan,
+  isImplementationPlanReady,
+  PlanError,
+  readIssuePlan,
+  requestIssuePlanChanges,
+} from "./plans.ts";
 import { selectNextIssue } from "./queues.ts";
 import {
   addIssueDependency,
@@ -13,22 +21,20 @@ import {
   createIssue,
   findIssueByPublicId,
   getProjectKeyForIssue,
+  IssueRepositoryError,
   isValidComplexity,
   isValidTriageRole,
   isValidWorkflowStatus,
-  IssueRepositoryError,
   listBlockerIssues,
   listIssues,
   removeIssueDependency,
   resolveBodyInput,
   updateIssue,
 } from "./repository.ts";
-import { requestIssuePlanChanges } from "./plans.ts";
+import type { Issue } from "./types.ts";
+import { QUEUE_MODES, type QueueMode } from "./types.ts";
 import { isIssueUnblocked } from "./unblocked.ts";
 import { moveIssue, WorkflowError } from "./workflow.ts";
-import { QUEUE_MODES, type QueueMode } from "./types.ts";
-import type { Issue } from "./types.ts";
-import type { CommandResult } from "../projects/commands.ts";
 
 export function runIssueCreate(
   db: Database,
@@ -96,9 +102,7 @@ export function runIssueCreate(
         workflowStatus: input.workflowStatus as Issue["workflowStatus"] | undefined,
         complexity: input.complexity as Issue["complexity"] | undefined,
         manualBlocker: input.manualBlocker,
-        blockedByPublicIds: input.blockedBy
-          ? [input.blockedBy.trim().toUpperCase()]
-          : undefined,
+        blockedByPublicIds: input.blockedBy ? [input.blockedBy.trim().toUpperCase()] : undefined,
       }),
     );
     return { ok: true, data: issueToOutput(db, issue) };
@@ -259,9 +263,7 @@ export function runIssueBlockBy(
   }
 
   try {
-    withTransaction(db, () =>
-      addIssueDependency(db, input.publicId, input.blockerPublicId),
-    );
+    withTransaction(db, () => addIssueDependency(db, input.publicId, input.blockerPublicId));
     const issue = findIssueByPublicId(db, input.publicId);
     if (!issue) {
       return {
@@ -297,9 +299,7 @@ export function runIssueUnblockBy(
   }
 
   try {
-    withTransaction(db, () =>
-      removeIssueDependency(db, input.publicId, input.blockerPublicId),
-    );
+    withTransaction(db, () => removeIssueDependency(db, input.publicId, input.blockerPublicId));
     const issue = findIssueByPublicId(db, input.publicId);
     if (!issue) {
       return {
@@ -340,10 +340,7 @@ export function runIssueRequestPlanChanges(
   }
 }
 
-export function runIssueShow(
-  db: Database,
-  publicId: string,
-): CommandResult {
+export function runIssueShow(db: Database, publicId: string): CommandResult {
   if (!publicId.trim()) {
     return {
       ok: false,
@@ -398,11 +395,7 @@ export function runIssueNext(
     }
   }
 
-  const issue = selectNextIssue(
-    db,
-    input.mode as QueueMode,
-    projectKey || undefined,
-  );
+  const issue = selectNextIssue(db, input.mode as QueueMode, projectKey || undefined);
 
   if (!issue) {
     return {
@@ -491,9 +484,7 @@ export function runIssueComment(
   }
 
   try {
-    const comment = withTransaction(db, () =>
-      addIssueComment(db, input.publicId, input.body!),
-    );
+    const comment = withTransaction(db, () => addIssueComment(db, input.publicId, input.body!));
     const issue = findIssueByPublicId(db, input.publicId);
     return {
       ok: true,
@@ -544,10 +535,7 @@ export async function runIssueAttachPlan(
   }
 }
 
-export function runIssueApprovePlan(
-  db: Database,
-  publicId: string,
-): CommandResult {
+export function runIssueApprovePlan(db: Database, publicId: string): CommandResult {
   if (!publicId.trim()) {
     return {
       ok: false,
@@ -695,9 +683,7 @@ function resolveProjectKey(
   db: Database,
   projectKey: string | undefined,
   cwd: string,
-):
-  | { ok: true; key: string }
-  | { ok: false; error: { code: string; message: string } } {
+): { ok: true; key: string } | { ok: false; error: { code: string; message: string } } {
   if (projectKey?.trim()) {
     return { ok: true, key: projectKey.trim() };
   }
@@ -727,10 +713,7 @@ function issueToOutput(db: Database, issue: Issue): Record<string, unknown> {
   };
 }
 
-function issueSummaryToOutput(
-  db: Database,
-  issue: Issue,
-): Record<string, unknown> {
+function issueSummaryToOutput(db: Database, issue: Issue): Record<string, unknown> {
   return {
     id: issue.id,
     publicId: issue.publicId,
@@ -749,10 +732,7 @@ function issueSummaryToOutput(
   };
 }
 
-function issueDetailToOutput(
-  db: Database,
-  issue: Issue,
-): Record<string, unknown> {
+function issueDetailToOutput(db: Database, issue: Issue): Record<string, unknown> {
   const parsed = parseIssueMarkdown(issue.bodyMarkdown);
   const blockers = listBlockerIssues(db, issue.id);
 

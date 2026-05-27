@@ -1,17 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import {
-  closeDatabase,
-  openDatabase,
-} from "../db/client.ts";
-import { inferProjectFromCwd, normalizeProjectKey } from "./repository.ts";
-import { pathMatchesPrefix } from "./paths.ts";
-import {
-  addProjectPath,
-  createProject,
-  findProjectByKey,
-} from "../index.ts";
+
+import { closeDatabase, openDatabase } from "../db/client.ts";
+import { addProjectPath, createProject, findProjectByKey } from "../index.ts";
 import { runDeck, setupInitializedHome } from "../testing/helpers.ts";
+import { normalizePath, pathMatchesPrefix } from "./paths.ts";
+import { inferProjectFromCwd, normalizeProjectKey } from "./repository.ts";
 
 describe("project path matching", () => {
   test("matches child directories but not sibling prefixes", () => {
@@ -26,16 +20,7 @@ describe("project registry", () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
     const code = await runDeck(
-      [
-        "project",
-        "add",
-        "--key",
-        "ola",
-        "--name",
-        "Ola UI",
-        "--kind",
-        "app",
-      ],
+      ["project", "add", "--key", "ola", "--name", "Ola UI", "--kind", "app"],
       isolated,
     );
     expect(code).toBe(0);
@@ -52,14 +37,7 @@ describe("project registry", () => {
 
   test("rejects duplicate project keys", async () => {
     const isolated = await setupInitializedHome();
-    const args = [
-      "project",
-      "add",
-      "--key",
-      "OLA",
-      "--name",
-      "First",
-    ];
+    const args = ["project", "add", "--key", "OLA", "--name", "First"];
     expect(await runDeck(args, isolated)).toBe(0);
     expect(await runDeck(args, isolated)).toBe(1);
   });
@@ -67,23 +45,11 @@ describe("project registry", () => {
   test("deck project path add registers normalized paths", async () => {
     const isolated = await setupInitializedHome();
     const { env, home } = isolated;
-    const repoRoot = join(home, "repos", "ola");
-    expect(
-      await runDeck(["project", "add", "--key", "OLA", "--name", "Ola"], isolated),
-    ).toBe(0);
+    const repoRoot = normalizePath(join(home, "repos", "ola"));
+    expect(await runDeck(["project", "add", "--key", "OLA", "--name", "Ola"], isolated)).toBe(0);
     expect(
       await runDeck(
-        [
-          "project",
-          "path",
-          "add",
-          "--project",
-          "ola",
-          "--path",
-          repoRoot,
-          "--label",
-          "main",
-        ],
+        ["project", "path", "add", "--project", "ola", "--path", repoRoot, "--label", "main"],
         isolated,
       ),
     ).toBe(0);
@@ -109,9 +75,7 @@ describe("project registry", () => {
     try {
       const project = createProject(db, { key: "DUP", name: "Dup" });
       addProjectPath(db, { projectKey: project.key, path: repoRoot });
-      expect(() =>
-        addProjectPath(db, { projectKey: project.key, path: repoRoot }),
-      ).toThrow();
+      expect(() => addProjectPath(db, { projectKey: project.key, path: repoRoot })).toThrow();
     } finally {
       closeDatabase(db);
     }

@@ -1,17 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+
+import { normalizePath } from "../projects/paths.ts";
+import { parseDeckJson, runDeck, setupInitializedHome } from "../testing/helpers.ts";
 import { PROMPT_SECTIONS } from "./contracts.ts";
-import {
-  parseDeckJson,
-  runDeck,
-  setupInitializedHome,
-} from "../testing/helpers.ts";
 
 async function setupProjectWithIssue() {
   const isolated = await setupInitializedHome();
 
-  const repoRoot = join(isolated.home, "repo");
+  const repoRoot = normalizePath(join(isolated.home, "repo"));
   await mkdir(repoRoot, { recursive: true });
 
   await runDeck(
@@ -29,16 +27,7 @@ async function setupProjectWithIssue() {
     isolated,
   );
   await runDeck(
-    [
-      "project",
-      "path",
-      "add",
-      "--project",
-      "PRM",
-      "--path",
-      repoRoot,
-      "--json",
-    ],
+    ["project", "path", "add", "--project", "PRM", "--path", repoRoot, "--json"],
     isolated,
   );
 
@@ -55,10 +44,7 @@ async function captureJsonPrompt(
     lines.push(args.map(String).join(" "));
   };
   try {
-    const code = await runDeck(
-      ["issue", "prompt", "PRM-1", "--mode", mode, "--json"],
-      isolated,
-    );
+    const code = await runDeck(["issue", "prompt", "PRM-1", "--mode", mode, "--json"], isolated);
     expect(code).toBe(0);
     const parsed = parseDeckJson<{ prompt?: string }>(lines.join("\n"));
     expect(parsed.ok).toBe(true);
@@ -177,14 +163,7 @@ describe("issue prompts", () => {
     );
 
     await runDeck(
-      [
-        "issue",
-        "attach-plan",
-        "PRM-1",
-        "--body",
-        "## Implementation plan\n\nStep one",
-        "--json",
-      ],
+      ["issue", "attach-plan", "PRM-1", "--body", "## Implementation plan\n\nStep one", "--json"],
       isolated,
     );
     await runDeck(["issue", "approve-plan", "PRM-1", "--json"], isolated);
@@ -219,26 +198,12 @@ describe("issue prompts", () => {
     );
 
     await runDeck(
-      [
-        "issue",
-        "attach-plan",
-        "PRM-1",
-        "--body",
-        "# Plan\n\nInitial draft",
-        "--json",
-      ],
+      ["issue", "attach-plan", "PRM-1", "--body", "# Plan\n\nInitial draft", "--json"],
       isolated,
     );
     await runDeck(["issue", "approve-plan", "PRM-1", "--json"], isolated);
     await runDeck(
-      [
-        "issue",
-        "request-plan-changes",
-        "PRM-1",
-        "--validation",
-        "Add error handling",
-        "--json",
-      ],
+      ["issue", "request-plan-changes", "PRM-1", "--validation", "Add error handling", "--json"],
       isolated,
     );
 
@@ -325,9 +290,7 @@ describe("issue prompts", () => {
     const prompt = await captureJsonPrompt(isolated, "address-review");
     expect(prompt).toContain(PROMPT_SECTIONS.reviewContext);
     expect(prompt).toContain("Add regression coverage for queue overlap");
-    expect(prompt).toContain(
-      "Please cover the address-review queue case explicitly.",
-    );
+    expect(prompt).toContain("Please cover the address-review queue case explicitly.");
   });
 
   test("prompt text matches snapshot sections for plan mode", async () => {

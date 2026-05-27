@@ -1,7 +1,8 @@
-import type { Database } from "bun:sqlite";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+
+import type { Database } from "../db/client.ts";
 import { nowIso } from "../time.ts";
 import type { Document, DocumentKind, IssueDocumentLink, IssueDocumentLinkKind } from "./types.ts";
 
@@ -22,10 +23,7 @@ type LinkRow = {
 };
 
 export class DocumentRepositoryError extends Error {
-  readonly code:
-    | "path_outside_home"
-    | "document_not_found"
-    | "link_not_found";
+  readonly code: "path_outside_home" | "document_not_found" | "link_not_found";
 
   constructor(
     code: "path_outside_home" | "document_not_found" | "link_not_found",
@@ -84,10 +82,7 @@ export async function writeMarkdownDocument(
   return absolutePath;
 }
 
-export async function readMarkdownDocument(
-  home: string,
-  relativePath: string,
-): Promise<string> {
+export async function readMarkdownDocument(home: string, relativePath: string): Promise<string> {
   const absolutePath = resolveDocumentPath(home, relativePath);
   return readFile(absolutePath, "utf8");
 }
@@ -100,17 +95,12 @@ export function upsertDocument(
   },
 ): Document {
   const existing = db
-    .query<DocumentRow, [string]>(
-      "SELECT * FROM documents WHERE relative_path = ?",
-    )
+    .query<DocumentRow, [string]>("SELECT * FROM documents WHERE relative_path = ?")
     .get(input.relativePath);
 
   if (existing) {
     const timestamp = nowIso();
-    db.query("UPDATE documents SET updated_at = ? WHERE id = ?").run(
-      timestamp,
-      existing.id,
-    );
+    db.query("UPDATE documents SET updated_at = ? WHERE id = ?").run(timestamp, existing.id);
     return mapDocument({ ...existing, updated_at: timestamp });
   }
 
@@ -126,13 +116,7 @@ export function upsertDocument(
   db.query(
     `INSERT INTO documents (id, kind, relative_path, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(
-    document.id,
-    document.kind,
-    document.relativePath,
-    document.createdAt,
-    document.updatedAt,
-  );
+  ).run(document.id, document.kind, document.relativePath, document.createdAt, document.updatedAt);
 
   return document;
 }
@@ -152,9 +136,10 @@ export function linkDocumentToIssue(
     .get(input.issueId, input.linkKind);
 
   if (existing) {
-    db.query(
-      "UPDATE issue_document_links SET document_id = ? WHERE id = ?",
-    ).run(input.documentId, existing.id);
+    db.query("UPDATE issue_document_links SET document_id = ? WHERE id = ?").run(
+      input.documentId,
+      existing.id,
+    );
     return mapLink({ ...existing, document_id: input.documentId });
   }
 

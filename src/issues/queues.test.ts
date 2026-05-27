@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import {
-  closeDatabase,
-  openDatabase,
-} from "../db/client.ts";
-import {
-  createIssue,
-  isIssueUnblocked,
-  selectNextIssue,
-  updateIssue,
-} from "../index.ts";
+
+import { closeDatabase, openDatabase } from "../db/client.ts";
+import { createIssue, isIssueUnblocked, selectNextIssue, updateIssue } from "../index.ts";
 import { createProject } from "../projects/repository.ts";
 import { setupInitializedHome } from "../testing/helpers.ts";
 

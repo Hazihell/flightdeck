@@ -6,10 +6,7 @@ export const DEFAULT_HOME_DIR_NAME = "Flightdeck";
 /**
  * Resolves Flightdeck Home: `FLIGHTDECK_HOME` when set, otherwise `~/Flightdeck`.
  */
-export function resolveFlightdeckHome(
-  env: NodeJS.ProcessEnv,
-  platformHome: string,
-): string {
+export function resolveFlightdeckHome(env: NodeJS.ProcessEnv, platformHome: string): string {
   const override = env.FLIGHTDECK_HOME?.trim();
   if (override) {
     return override;

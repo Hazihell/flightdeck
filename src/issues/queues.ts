@@ -1,13 +1,9 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "../db/client.ts";
 import { listIssues } from "./repository.ts";
-import { isIssueUnblocked } from "./unblocked.ts";
 import type { Issue, PlanStatus, QueueMode } from "./types.ts";
+import { isIssueUnblocked } from "./unblocked.ts";
 
-export function matchesQueueMode(
-  db: Database,
-  issue: Issue,
-  mode: QueueMode,
-): boolean {
+export function matchesQueueMode(db: Database, issue: Issue, mode: QueueMode): boolean {
   if (mode === "review") {
     return issue.workflowStatus === "needs-review";
   }
@@ -27,8 +23,7 @@ export function matchesQueueMode(
   }
 
   if (mode === "implement") {
-    const planReady =
-      issue.complexity === "simple" || issue.planStatus === "approved";
+    const planReady = issue.complexity === "simple" || issue.planStatus === "approved";
     return (
       issue.triageRole === "ready-for-agent" &&
       issue.workflowStatus === "backlog" &&

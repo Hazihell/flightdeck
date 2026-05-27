@@ -32,7 +32,9 @@ export function sectionRepositoryPath(path: string | null): string {
   return [
     PROMPT_SECTIONS.repositoryPath,
     "",
-    path?.trim() ? path.trim() : "(no registered repository path — register one with `deck project path add`)",
+    path?.trim()
+      ? path.trim()
+      : "(no registered repository path — register one with `deck project path add`)",
   ].join("\n");
 }
 
@@ -73,9 +75,7 @@ export function sectionBlockerContext(input: {
   if (input.dependencyBlockers.length > 0) {
     lines.push("- Dependency blockers:");
     for (const blocker of input.dependencyBlockers) {
-      lines.push(
-        `  - ${blocker.publicId}: ${blocker.title} [${blocker.workflowStatus}]`,
-      );
+      lines.push(`  - ${blocker.publicId}: ${blocker.title} [${blocker.workflowStatus}]`);
     }
   } else {
     lines.push("- Dependency blockers: none");

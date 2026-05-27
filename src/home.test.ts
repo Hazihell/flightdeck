@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import {
-  DEFAULT_HOME_DIR_NAME,
-  resolveFlightdeckHome,
-} from "./home.ts";
+
+import { DEFAULT_HOME_DIR_NAME, resolveFlightdeckHome } from "./home.ts";
 import { createIsolatedFlightdeckHome } from "./testing/helpers.ts";
 
 describe("resolveFlightdeckHome", () => {
@@ -15,8 +13,6 @@ describe("resolveFlightdeckHome", () => {
 
   test("defaults to ~/Flightdeck when override is unset", () => {
     const platformHome = "/Users/example";
-    expect(resolveFlightdeckHome({}, platformHome)).toBe(
-      join(platformHome, DEFAULT_HOME_DIR_NAME),
-    );
+    expect(resolveFlightdeckHome({}, platformHome)).toBe(join(platformHome, DEFAULT_HOME_DIR_NAME));
   });
 });

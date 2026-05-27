@@ -24,9 +24,7 @@ export type InferProjectSuccess = {
   matchedPath: ProjectPath;
 };
 
-export type InferProjectErrorCode =
-  | "no_matching_path"
-  | "project_not_found";
+export type InferProjectErrorCode = "no_matching_path" | "project_not_found";
 
 export type InferProjectFailure = {
   ok: false;

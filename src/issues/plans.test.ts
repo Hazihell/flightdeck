@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  closeDatabase,
-  openDatabase,
-} from "../db/client.ts";
-import { findIssueByPublicId, selectNextIssue } from "../index.ts";
+
+import { closeDatabase, openDatabase } from "../db/client.ts";
 import { planRelativePath } from "../documents/repository.ts";
+import { findIssueByPublicId, selectNextIssue } from "../index.ts";
 import { runDeck, setupInitializedHome } from "../testing/helpers.ts";
 
 describe("plan commands", () => {
@@ -14,23 +13,12 @@ describe("plan commands", () => {
     const isolated = await setupInitializedHome();
     const { env, home } = isolated;
     const repoRoot = join(home, "fake-repo");
-    await Bun.write(join(repoRoot, ".gitkeep"), "");
+    await mkdir(repoRoot, { recursive: true });
+    await writeFile(join(repoRoot, ".gitkeep"), "");
 
+    await runDeck(["project", "add", "--key", "PLN", "--name", "Plans", "--json"], isolated);
     await runDeck(
-      ["project", "add", "--key", "PLN", "--name", "Plans", "--json"],
-      isolated,
-    );
-    await runDeck(
-      [
-        "project",
-        "path",
-        "add",
-        "--project",
-        "PLN",
-        "--path",
-        repoRoot,
-        "--json",
-      ],
+      ["project", "path", "add", "--project", "PLN", "--path", repoRoot, "--json"],
       isolated,
     );
     await runDeck(
@@ -54,16 +42,13 @@ describe("plan commands", () => {
 
     const planMarkdown = "# Plan\n\n## Steps\n\n1. Do thing\n2. Verify";
     expect(
-      await runDeck(
-        ["issue", "attach-plan", "PLN-1", "--body", planMarkdown, "--json"],
-        isolated,
-      ),
+      await runDeck(["issue", "attach-plan", "PLN-1", "--body", planMarkdown, "--json"], isolated),
     ).toBe(0);
 
     const relativePath = planRelativePath("PLN-1");
     const planPath = join(home, relativePath);
     expect(existsSync(planPath)).toBe(true);
-    expect(await Bun.file(planPath).text()).toBe(planMarkdown);
+    expect(await readFile(planPath, "utf8")).toBe(planMarkdown);
     expect(existsSync(join(repoRoot, "plan.md"))).toBe(false);
     expect(existsSync(join(repoRoot, relativePath))).toBe(false);
 
@@ -76,9 +61,7 @@ describe("plan commands", () => {
       closeDatabase(db);
     }
 
-    expect(
-      await runDeck(["issue", "approve-plan", "PLN-1", "--json"], isolated),
-    ).toBe(0);
+    expect(await runDeck(["issue", "approve-plan", "PLN-1", "--json"], isolated)).toBe(0);
 
     const db2 = openDatabase(env.FLIGHTDECK_HOME!);
     try {
@@ -95,10 +78,7 @@ describe("plan commands", () => {
     const isolated = await setupInitializedHome();
     const { env } = isolated;
 
-    await runDeck(
-      ["project", "add", "--key", "RPC", "--name", "Plan changes", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "RPC", "--name", "Plan changes", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -118,28 +98,14 @@ describe("plan commands", () => {
       isolated,
     );
     await runDeck(
-      [
-        "issue",
-        "attach-plan",
-        "RPC-1",
-        "--body",
-        "# Plan\n\nInitial",
-        "--json",
-      ],
+      ["issue", "attach-plan", "RPC-1", "--body", "# Plan\n\nInitial", "--json"],
       isolated,
     );
     await runDeck(["issue", "approve-plan", "RPC-1", "--json"], isolated);
 
     expect(
       await runDeck(
-        [
-          "issue",
-          "request-plan-changes",
-          "RPC-1",
-          "--validation",
-          "Add error handling",
-          "--json",
-        ],
+        ["issue", "request-plan-changes", "RPC-1", "--validation", "Add error handling", "--json"],
         isolated,
       ),
     ).toBe(0);
@@ -158,10 +124,7 @@ describe("plan commands", () => {
 
   test("approve-plan fails without attached plan", async () => {
     const isolated = await setupInitializedHome();
-    await runDeck(
-      ["project", "add", "--key", "APR", "--name", "Approve", "--json"],
-      isolated,
-    );
+    await runDeck(["project", "add", "--key", "APR", "--name", "Approve", "--json"], isolated);
     await runDeck(
       [
         "issue",
@@ -179,8 +142,6 @@ describe("plan commands", () => {
       isolated,
     );
 
-    expect(
-      await runDeck(["issue", "approve-plan", "APR-1", "--json"], isolated),
-    ).toBe(1);
+    expect(await runDeck(["issue", "approve-plan", "APR-1", "--json"], isolated)).toBe(1);
   });
 });

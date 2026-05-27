@@ -108,14 +108,11 @@ function includeReviewContext(mode: PromptMode, input: PromptInput): boolean {
 
 export function generatePrompt(input: PromptInput): PromptOutput {
   const unblocked =
-    !input.manualBlocker.trim() && input.dependencyBlockers.every((b) => b.workflowStatus === "done");
+    !input.manualBlocker.trim() &&
+    input.dependencyBlockers.every((b) => b.workflowStatus === "done");
 
   const sections = [
-    sectionProjectContext(
-      input.projectKey,
-      input.projectName,
-      input.projectInstructions,
-    ),
+    sectionProjectContext(input.projectKey, input.projectName, input.projectInstructions),
     sectionRepositoryPath(input.repositoryPath),
     sectionIssueBody(input.issueBodyMarkdown),
     includePlan(input.mode, input) ? sectionIssuePlan(input.planContent) : "",

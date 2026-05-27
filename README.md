@@ -30,9 +30,9 @@ deck init
 
 ## Flightdeck home (`FLIGHTDECK_HOME`)
 
-| Location | Purpose |
-|----------|---------|
-| Default `~/Flightdeck` | Database, config, markdown documents |
+| Location                  | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| Default `~/Flightdeck`    | Database, config, markdown documents                    |
 | `FLIGHTDECK_HOME` env var | Override home for tests, backup, or multiple workspaces |
 
 Typical layout:
@@ -73,20 +73,20 @@ See [docs/skill-adapter.md](./docs/skill-adapter.md) for the required issue body
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `deck init` | Create database and home layout |
-| `deck project add` | Register a project |
-| `deck project path add` | Register a filesystem path for a project |
-| `deck issue create` | Create an issue (Flightdeck-compatible body) |
-| `deck issue list` | List issues with optional filters |
-| `deck issue show` | Show one issue with parsed markdown fields |
-| `deck issue next` | Select next issue by mode (`plan`, `implement`, `review`, `address-review`) |
-| `deck issue move` | Update workflow status and optional git metadata |
-| `deck issue comment` | Add a markdown comment |
-| `deck issue attach-plan` | Attach implementation plan markdown |
-| `deck issue approve-plan` | Approve attached plan |
-| `deck issue prompt` | Generate mode-specific agent prompt |
+| Command                   | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `deck init`               | Create database and home layout                                             |
+| `deck project add`        | Register a project                                                          |
+| `deck project path add`   | Register a filesystem path for a project                                    |
+| `deck issue create`       | Create an issue (Flightdeck-compatible body)                                |
+| `deck issue list`         | List issues with optional filters                                           |
+| `deck issue show`         | Show one issue with parsed markdown fields                                  |
+| `deck issue next`         | Select next issue by mode (`plan`, `implement`, `review`, `address-review`) |
+| `deck issue move`         | Update workflow status and optional git metadata                            |
+| `deck issue comment`      | Add a markdown comment                                                      |
+| `deck issue attach-plan`  | Attach implementation plan markdown                                         |
+| `deck issue approve-plan` | Approve attached plan                                                       |
+| `deck issue prompt`       | Generate mode-specific agent prompt                                         |
 
 Add `--json` for machine-readable output. Run `deck --help` for flag details.
 

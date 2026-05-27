@@ -1,94 +1,20 @@
-export { runCli, HELP_TEXT } from "./cli.ts";
-export { parseArgs, flagString, hasFlag } from "./cli-args.ts";
+export { HELP_TEXT, runCli } from "./cli.ts";
+export { flagString, hasFlag, parseArgs } from "./cli-args.ts";
 export {
-  resolveFlightdeckHome,
-  ensureFlightdeckHome,
-  flightdeckDatabasePath,
-  DEFAULT_HOME_DIR_NAME,
-} from "./home.ts";
-export { nowIso } from "./time.ts";
-export { initFlightdeck } from "./init.ts";
-export {
-  openDatabase,
   closeDatabase,
-  migrate,
-  getAppliedMigrationVersion,
-  withTransaction,
   expectedSchemaVersion,
+  getAppliedMigrationVersion,
+  migrate,
+  openDatabase,
+  withTransaction,
 } from "./db/client.ts";
-export { SCHEMA_VERSION, MIGRATIONS } from "./db/schema.ts";
+export { MIGRATIONS, SCHEMA_VERSION } from "./db/schema.ts";
 export {
-  normalizeProjectKey,
-  createProject,
-  findProjectByKey,
-  findProjectById,
-  addProjectPath,
-  listProjectPaths,
-  listAllProjectPaths,
-  inferProjectFromCwd,
-  ProjectRepositoryError,
-} from "./projects/repository.ts";
-export { normalizePath, pathMatchesPrefix } from "./projects/paths.ts";
-export {
-  DEFAULT_PROJECT_KIND,
-  DEFAULT_PATH_KIND,
-  type Project,
-  type ProjectPath,
-  type InferProjectResult,
-} from "./projects/types.ts";
-export { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
-export {
-  parseIssueMarkdown,
-  extractPublicIds,
-  DEFAULT_ISSUE_BODY,
-  PUBLIC_ID_PATTERN,
-} from "./issues/markdown.ts";
-export {
-  createIssue,
-  findIssueByPublicId,
-  listIssues,
-  listAllIssues,
-  listBlockerIssues,
-  addIssueDependency,
-  removeIssueDependency,
-  updateIssue,
-  resolveBodyInput,
-  formatPublicId,
-  IssueRepositoryError,
-} from "./issues/repository.ts";
-export { isIssueUnblocked } from "./issues/unblocked.ts";
-export { matchesQueueMode, selectNextIssue } from "./issues/queues.ts";
-export {
-  runIssueCreate,
-  runIssueList,
-  runIssueShow,
-  runIssueNext,
-  runIssueMove,
-  runIssueComment,
-  runIssueAttachPlan,
-  runIssueApprovePlan,
-  runIssueBlockBy,
-  runIssuePrompt,
-  runIssueRequestPlanChanges,
-  runIssueUnblockBy,
-  runIssueUpdate,
-} from "./issues/commands.ts";
-export { moveIssue, WorkflowError } from "./issues/workflow.ts";
-export { addIssueComment, listIssueComments } from "./issues/comments.ts";
-export {
-  attachIssuePlan,
-  approveIssuePlan,
-  requestIssuePlanChanges,
-  readIssuePlan,
-  isImplementationPlanReady,
-  PlanError,
-} from "./issues/plans.ts";
-export {
+  DocumentRepositoryError,
   planRelativePath,
-  writeMarkdownDocument,
   readMarkdownDocument,
   upsertDocument,
-  DocumentRepositoryError,
+  writeMarkdownDocument,
 } from "./documents/repository.ts";
 export {
   DOCUMENT_KINDS,
@@ -96,20 +22,94 @@ export {
   type DocumentKind,
   type IssueDocumentLink,
 } from "./documents/types.ts";
-export { generatePrompt } from "./prompts/generator.ts";
-export { PROMPT_SECTIONS } from "./prompts/contracts.ts";
-export { PROMPT_MODES, isPromptMode, type PromptMode, type PromptInput } from "./prompts/types.ts";
 export {
-  TRIAGE_ROLES,
-  WORKFLOW_STATUSES,
+  DEFAULT_HOME_DIR_NAME,
+  ensureFlightdeckHome,
+  flightdeckDatabasePath,
+  resolveFlightdeckHome,
+} from "./home.ts";
+export { initFlightdeck } from "./init.ts";
+export {
+  runIssueApprovePlan,
+  runIssueAttachPlan,
+  runIssueBlockBy,
+  runIssueComment,
+  runIssueCreate,
+  runIssueList,
+  runIssueMove,
+  runIssueNext,
+  runIssuePrompt,
+  runIssueRequestPlanChanges,
+  runIssueShow,
+  runIssueUnblockBy,
+  runIssueUpdate,
+} from "./issues/commands.ts";
+export { addIssueComment, listIssueComments } from "./issues/comments.ts";
+export {
+  DEFAULT_ISSUE_BODY,
+  extractPublicIds,
+  PUBLIC_ID_PATTERN,
+  parseIssueMarkdown,
+} from "./issues/markdown.ts";
+export {
+  approveIssuePlan,
+  attachIssuePlan,
+  isImplementationPlanReady,
+  PlanError,
+  readIssuePlan,
+  requestIssuePlanChanges,
+} from "./issues/plans.ts";
+export { matchesQueueMode, selectNextIssue } from "./issues/queues.ts";
+export {
+  addIssueDependency,
+  createIssue,
+  findIssueByPublicId,
+  formatPublicId,
+  IssueRepositoryError,
+  listAllIssues,
+  listBlockerIssues,
+  listIssues,
+  removeIssueDependency,
+  resolveBodyInput,
+  updateIssue,
+} from "./issues/repository.ts";
+export {
   COMPLEXITY_VALUES,
-  PLAN_STATUSES,
-  QUEUE_MODES,
-  type Issue,
-  type TriageRole,
-  type WorkflowStatus,
   type Complexity,
-  type PlanStatus,
-  type QueueMode,
+  type Issue,
   type ParsedIssueMarkdown,
+  PLAN_STATUSES,
+  type PlanStatus,
+  QUEUE_MODES,
+  type QueueMode,
+  TRIAGE_ROLES,
+  type TriageRole,
+  WORKFLOW_STATUSES,
+  type WorkflowStatus,
 } from "./issues/types.ts";
+export { isIssueUnblocked } from "./issues/unblocked.ts";
+export { moveIssue, WorkflowError } from "./issues/workflow.ts";
+export { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
+export { normalizePath, pathMatchesPrefix } from "./projects/paths.ts";
+export {
+  addProjectPath,
+  createProject,
+  findProjectById,
+  findProjectByKey,
+  inferProjectFromCwd,
+  listAllProjectPaths,
+  listProjectPaths,
+  normalizeProjectKey,
+  ProjectRepositoryError,
+} from "./projects/repository.ts";
+export {
+  DEFAULT_PATH_KIND,
+  DEFAULT_PROJECT_KIND,
+  type InferProjectResult,
+  type Project,
+  type ProjectPath,
+} from "./projects/types.ts";
+export { PROMPT_SECTIONS } from "./prompts/contracts.ts";
+export { generatePrompt } from "./prompts/generator.ts";
+export { isPromptMode, PROMPT_MODES, type PromptInput, type PromptMode } from "./prompts/types.ts";
+export { nowIso } from "./time.ts";

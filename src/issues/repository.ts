@@ -1,24 +1,24 @@
-import type { Database } from "bun:sqlite";
-import { readFileSync } from "node:fs";
-import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+
+import type { Database } from "../db/client.ts";
+import { findProjectById, findProjectByKey } from "../projects/repository.ts";
 import { nowIso } from "../time.ts";
-import { findProjectByKey, findProjectById } from "../projects/repository.ts";
 import { DEFAULT_ISSUE_BODY, parseIssueMarkdown } from "./markdown.ts";
 import {
   COMPLEXITY_VALUES,
+  type Complexity,
   DEFAULT_COMPLEXITY,
   DEFAULT_PLAN_STATUS,
   DEFAULT_TRIAGE_ROLE,
   DEFAULT_WORKFLOW_STATUS,
-  PLAN_STATUSES,
-  TRIAGE_ROLES,
-  WORKFLOW_STATUSES,
-  type Complexity,
   type Issue,
   type IssueDependency,
+  PLAN_STATUSES,
   type PlanStatus,
+  TRIAGE_ROLES,
   type TriageRole,
+  WORKFLOW_STATUSES,
   type WorkflowStatus,
 } from "./types.ts";
 
@@ -109,9 +109,10 @@ function allocateSequence(db: Database, projectId: string): number {
     .get(projectId);
 
   if (!existing) {
-    db.query(
-      "INSERT INTO project_issue_sequences (project_id, next_sequence) VALUES (?, ?)",
-    ).run(projectId, 2);
+    db.query("INSERT INTO project_issue_sequences (project_id, next_sequence) VALUES (?, ?)").run(
+      projectId,
+      2,
+    );
     return 1;
   }
 
@@ -142,10 +143,7 @@ export function createIssue(
 ): Issue {
   const project = findProjectByKey(db, input.projectKey);
   if (!project) {
-    throw new IssueRepositoryError(
-      "project_not_found",
-      `Project not found: ${input.projectKey}`,
-    );
+    throw new IssueRepositoryError("project_not_found", `Project not found: ${input.projectKey}`);
   }
 
   const sequence = allocateSequence(db, project.id);
@@ -209,9 +207,7 @@ export function createIssue(
     issue.updatedAt,
   );
 
-  const blockedBy = (input.blockedByPublicIds ?? []).map((id) =>
-    id.trim().toUpperCase(),
-  );
+  const blockedBy = (input.blockedByPublicIds ?? []).map((id) => id.trim().toUpperCase());
   for (const blockerPublicId of blockedBy) {
     addIssueDependency(db, issue.publicId, blockerPublicId);
   }
@@ -230,10 +226,7 @@ export function createIssue(
   return findIssueByPublicId(db, issue.publicId) ?? issue;
 }
 
-export function findIssueByPublicId(
-  db: Database,
-  publicId: string,
-): Issue | null {
+export function findIssueByPublicId(db: Database, publicId: string): Issue | null {
   const normalized = publicId.trim().toUpperCase();
   const row = db
     .query<IssueRow, [string]>("SELECT * FROM issues WHERE public_id = ?")
@@ -285,10 +278,7 @@ export function removeIssueDependency(
 ): void {
   const issue = findIssueByPublicId(db, issuePublicId);
   if (!issue) {
-    throw new IssueRepositoryError(
-      "issue_not_found",
-      `Issue not found: ${issuePublicId}`,
-    );
+    throw new IssueRepositoryError("issue_not_found", `Issue not found: ${issuePublicId}`);
   }
 
   const blocker = findIssueByPublicId(db, blockerPublicId);
@@ -315,9 +305,7 @@ export function addMissingDependenciesFromMarkdown(
     throw new IssueRepositoryError("issue_not_found", `Issue not found: ${issuePublicId}`);
   }
 
-  const existingIds = new Set(
-    listBlockerIssues(db, issue.id).map((blocker) => blocker.publicId),
-  );
+  const existingIds = new Set(listBlockerIssues(db, issue.id).map((blocker) => blocker.publicId));
 
   for (const depId of dependencyPublicIds.map((id) => id.trim().toUpperCase())) {
     if (!depId || existingIds.has(depId)) {
@@ -339,10 +327,7 @@ export function addIssueDependency(
 ): IssueDependency {
   const issue = findIssueByPublicId(db, issuePublicId);
   if (!issue) {
-    throw new IssueRepositoryError(
-      "issue_not_found",
-      `Issue not found: ${issuePublicId}`,
-    );
+    throw new IssueRepositoryError("issue_not_found", `Issue not found: ${issuePublicId}`);
   }
 
   const blocker = findIssueByPublicId(db, blockerPublicId);
@@ -354,10 +339,7 @@ export function addIssueDependency(
   }
 
   if (issue.id === blocker.id) {
-    throw new IssueRepositoryError(
-      "invalid_dependency",
-      "An issue cannot block itself",
-    );
+    throw new IssueRepositoryError("invalid_dependency", "An issue cannot block itself");
   }
 
   const existing = db
@@ -380,20 +362,12 @@ export function addIssueDependency(
   db.query(
     `INSERT INTO issue_dependencies (id, issue_id, blocker_issue_id, created_at)
      VALUES (?, ?, ?, ?)`,
-  ).run(
-    dependency.id,
-    dependency.issueId,
-    dependency.blockerIssueId,
-    dependency.createdAt,
-  );
+  ).run(dependency.id, dependency.issueId, dependency.blockerIssueId, dependency.createdAt);
 
   return dependency;
 }
 
-export function listIssueDependencies(
-  db: Database,
-  issueId: string,
-): IssueDependency[] {
+export function listIssueDependencies(db: Database, issueId: string): IssueDependency[] {
   const rows = db
     .query<DependencyRow, [string]>(
       "SELECT * FROM issue_dependencies WHERE issue_id = ? ORDER BY created_at ASC",
@@ -416,9 +390,7 @@ export function listBlockerIssues(db: Database, issueId: string): Issue[] {
 
 export function listAllIssues(db: Database): Issue[] {
   const rows = db
-    .query<IssueRow, []>(
-      "SELECT * FROM issues ORDER BY project_id ASC, sequence ASC",
-    )
+    .query<IssueRow, []>("SELECT * FROM issues ORDER BY project_id ASC, sequence ASC")
     .all();
   return rows.map(mapIssue);
 }
@@ -449,23 +421,18 @@ export function updateIssue(
   const updated: Issue = {
     ...issue,
     title: patch.title !== undefined ? patch.title.trim() : issue.title,
-    bodyMarkdown:
-      patch.bodyMarkdown !== undefined ? patch.bodyMarkdown : issue.bodyMarkdown,
+    bodyMarkdown: patch.bodyMarkdown !== undefined ? patch.bodyMarkdown : issue.bodyMarkdown,
     triageRole: patch.triageRole ?? issue.triageRole,
     workflowStatus: patch.workflowStatus ?? issue.workflowStatus,
     complexity: patch.complexity ?? issue.complexity,
     planStatus: patch.planStatus ?? issue.planStatus,
-    manualBlocker:
-      patch.manualBlocker !== undefined ? patch.manualBlocker : issue.manualBlocker,
+    manualBlocker: patch.manualBlocker !== undefined ? patch.manualBlocker : issue.manualBlocker,
     branch: patch.branch !== undefined ? patch.branch : issue.branch,
-    worktreePath:
-      patch.worktreePath !== undefined ? patch.worktreePath : issue.worktreePath,
+    worktreePath: patch.worktreePath !== undefined ? patch.worktreePath : issue.worktreePath,
     commitRef: patch.commitRef !== undefined ? patch.commitRef : issue.commitRef,
     prUrl: patch.prUrl !== undefined ? patch.prUrl : issue.prUrl,
     validationSummary:
-      patch.validationSummary !== undefined
-        ? patch.validationSummary
-        : issue.validationSummary,
+      patch.validationSummary !== undefined ? patch.validationSummary : issue.validationSummary,
     updatedAt: nowIso(),
   };
 

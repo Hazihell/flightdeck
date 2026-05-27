@@ -1,10 +1,6 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
-import {
-  addProjectPath,
-  createProject,
-  ProjectRepositoryError,
-} from "./repository.ts";
+import { addProjectPath, createProject, ProjectRepositoryError } from "./repository.ts";
 import type { Project, ProjectPath } from "./types.ts";
 
 export type CommandResult =

@@ -1,5 +1,4 @@
-import { existsSync } from "node:fs";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 
 function stripPrivatePrefix(path: string): string {

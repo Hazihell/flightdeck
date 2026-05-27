@@ -4,12 +4,12 @@ Flightdeck selects work through mode-specific **next queues** and generates **ag
 
 ## Prompt modes
 
-| Mode | Command | Purpose |
-|------|---------|---------|
-| Plan | `deck issue next --mode plan` | Create an implementation plan before code changes. |
-| Implement | `deck issue next --mode implement` | Execute a simple issue or an approved plan. |
-| Review | `deck issue next --mode review` | Review completed implementation (`needs-review`). |
-| Address review | `deck issue next --mode address-review` | Fix issues after `changes-requested`. |
+| Mode           | Command                                 | Purpose                                            |
+| -------------- | --------------------------------------- | -------------------------------------------------- |
+| Plan           | `deck issue next --mode plan`           | Create an implementation plan before code changes. |
+| Implement      | `deck issue next --mode implement`      | Execute a simple issue or an approved plan.        |
+| Review         | `deck issue next --mode review`         | Review completed implementation (`needs-review`).  |
+| Address review | `deck issue next --mode address-review` | Fix issues after `changes-requested`.              |
 
 Generate a prompt for a known issue:
 

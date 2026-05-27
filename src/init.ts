@@ -1,13 +1,5 @@
-import {
-  closeDatabase,
-  migrate,
-  openDatabase,
-} from "./db/client.ts";
-import {
-  ensureFlightdeckHome,
-  flightdeckDatabasePath,
-  resolveFlightdeckHome,
-} from "./home.ts";
+import { closeDatabase, migrate, openDatabase } from "./db/client.ts";
+import { ensureFlightdeckHome, flightdeckDatabasePath, resolveFlightdeckHome } from "./home.ts";
 
 export type InitResult = {
   home: string;

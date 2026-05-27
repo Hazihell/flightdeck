@@ -1,11 +1,6 @@
 import type { ParsedIssueMarkdown } from "./types.ts";
 
-const SECTION_HEADERS = [
-  "Parent",
-  "What to build",
-  "Acceptance criteria",
-  "Blocked by",
-] as const;
+const SECTION_HEADERS = ["Parent", "What to build", "Acceptance criteria", "Blocked by"] as const;
 
 export const PUBLIC_ID_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
 
@@ -27,12 +22,9 @@ export function parseIssueMarkdown(bodyMarkdown: string): ParsedIssueMarkdown {
 
   const parent = sections.get("Parent") ?? null;
   const whatToBuild = sections.get("What to build") ?? null;
-  const acceptanceCriteria = parseAcceptanceCriteria(
-    sections.get("Acceptance criteria") ?? "",
-  );
+  const acceptanceCriteria = parseAcceptanceCriteria(sections.get("Acceptance criteria") ?? "");
   const blockedByRaw = sections.get("Blocked by") ?? null;
-  const { dependencyPublicIds, manualBlockerFromMarkdown } =
-    parseBlockedBySection(blockedByRaw);
+  const { dependencyPublicIds, manualBlockerFromMarkdown } = parseBlockedBySection(blockedByRaw);
 
   return {
     parent: parent?.trim() ? parent.trim() : null,
@@ -130,8 +122,7 @@ function parseBlockedBySection(blockedBy: string | null): {
 
   return {
     dependencyPublicIds,
-    manualBlockerFromMarkdown:
-      manualLines.length > 0 ? manualLines.join("\n") : null,
+    manualBlockerFromMarkdown: manualLines.length > 0 ? manualLines.join("\n") : null,
   };
 }
 
