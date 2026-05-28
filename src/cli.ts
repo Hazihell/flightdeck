@@ -21,6 +21,7 @@ import {
   runIssueUpdate,
 } from "./issues/commands.ts";
 import { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
+import { runSkillInstall, runSkillInstructions } from "./skills/commands.ts";
 
 export const HELP_TEXT = `Flightdeck CLI
 
@@ -42,6 +43,8 @@ Usage:
   deck issue approve-plan <PUBLIC_ID>
   deck issue request-plan-changes <PUBLIC_ID> [--validation <TEXT>]
   deck issue prompt <PUBLIC_ID> --mode plan|implement|review|address-review [--path <PATH>] [--json]
+  deck skill install [--scope global|project] [--path <DIR>] [--name <NAME>] [--force] [--json]
+  deck skill instructions [--json]
 
 Global flags:
   --help    Show this help
@@ -83,6 +86,11 @@ function printHumanData(data: Record<string, unknown>): void {
 
   if (typeof data.prompt === "string") {
     console.log(String(data.prompt));
+    return;
+  }
+
+  if (typeof data.text === "string") {
+    console.log(data.text);
     return;
   }
 
@@ -473,6 +481,31 @@ export async function runCli(
       } finally {
         closeDatabase(db);
       }
+    }
+
+    if (root === "skill" && sub === "install" && parsed.command.length === 2) {
+      const result = await runSkillInstall({
+        scope: flagString(flags, "scope") ?? (hasFlag(flags, "project") ? "project" : undefined),
+        path: flagString(flags, "path"),
+        name: flagString(flags, "name"),
+        force: hasFlag(flags, "force"),
+        platformHome,
+        cwd: process.cwd(),
+      });
+      const output: CliOutput = result.ok
+        ? { ok: true, command: "skill install", data: result.data }
+        : { ok: false, command: "skill install", error: result.error };
+      printOutput(output, flags);
+      return result.ok ? 0 : 1;
+    }
+
+    if (root === "skill" && sub === "instructions" && parsed.command.length === 2) {
+      const result = runSkillInstructions();
+      const output: CliOutput = result.ok
+        ? { ok: true, command: "skill instructions", data: result.data }
+        : { ok: false, command: "skill instructions", error: result.error };
+      printOutput(output, flags);
+      return result.ok ? 0 : 1;
     }
 
     const output: CliOutput = {

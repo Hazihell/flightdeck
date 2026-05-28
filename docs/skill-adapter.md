@@ -90,6 +90,28 @@ Copy `data.publicId` into agent prompts, branch names, and dependency references
 
 When an external skill emits multiple slices, run one `deck issue create` per slice. Link dependencies with `--blocked-by` using public IDs returned from earlier creates in the same batch.
 
+## Generated agent skill
+
+Flightdeck can generate a small agent skill that teaches globally installed skills and agents to use `deck` as the issue tracker:
+
+```bash
+deck skill install --scope global
+```
+
+This writes `~/.agents/skills/flightdeck/SKILL.md` by default. Use project scope to write into a repository-local `.agents/skills` directory instead:
+
+```bash
+deck skill install --scope project --path /path/to/repository
+```
+
+The install command does not overwrite an existing `SKILL.md` unless `--force` is passed. Use `--path` with global scope to choose a different skills root.
+
+To print concise text for global agent instructions:
+
+```bash
+deck skill instructions
+```
+
 ## What skills should not do
 
 - Do not write Flightdeck state into project repositories.

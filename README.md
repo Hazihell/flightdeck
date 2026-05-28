@@ -87,8 +87,30 @@ See [docs/skill-adapter.md](./docs/skill-adapter.md) for the required issue body
 | `deck issue attach-plan`  | Attach implementation plan markdown                                         |
 | `deck issue approve-plan` | Approve attached plan                                                       |
 | `deck issue prompt`       | Generate mode-specific agent prompt                                         |
+| `deck skill install`      | Install a Flightdeck skill for external agents                              |
+| `deck skill instructions` | Print global instruction text for agents                                    |
 
 Add `--json` for machine-readable output. Run `deck --help` for flag details.
+
+## Agent skill setup
+
+If you use globally installed agent skills, install the Flightdeck skill so agents know to use `deck` for issue tracking:
+
+```bash
+deck skill install --scope global
+```
+
+By default this writes `~/.agents/skills/flightdeck/SKILL.md`. For a project-local skill instead:
+
+```bash
+deck skill install --scope project --path /path/to/repository
+```
+
+Print global instruction text you can add to your agent instructions markdown:
+
+```bash
+deck skill instructions
+```
 
 ## Development
 

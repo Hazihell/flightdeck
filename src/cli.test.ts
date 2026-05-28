@@ -8,6 +8,8 @@ describe("deck CLI", () => {
     expect(code).toBe(0);
     expect(HELP_TEXT).toContain("deck init");
     expect(HELP_TEXT).toContain("deck project add");
+    expect(HELP_TEXT).toContain("deck skill install");
+    expect(HELP_TEXT).toContain("deck skill instructions");
   });
 
   test("returns non-zero for unknown commands", async () => {
