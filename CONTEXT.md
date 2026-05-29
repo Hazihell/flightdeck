@@ -28,6 +28,10 @@ _Avoid_: Project identity
 A single actionable unit of work that can be triaged, assigned to a human or agent, reviewed, accepted, and completed.
 _Avoid_: Card, ticket, task
 
+**Parent Issue**:
+An issue that groups or scopes another issue through issue hierarchy. Parent issue relationships are separate from PRD links and blocker dependencies.
+_Avoid_: PRD, blocker
+
 **Vertical Slice**:
 A thin issue that delivers a narrow but complete path through the relevant layers and is demoable or verifiable on its own.
 _Avoid_: Layer task, component task
@@ -49,8 +53,24 @@ The Flightdeck lifecycle position of an issue after or alongside triage, such as
 _Avoid_: Triage role
 
 **Document**:
-A durable note, PRD, decision, plan, or research artifact stored as markdown content and indexed by Flightdeck.
+A durable reference artifact such as a PRD, decision, plan, or research note stored and indexed by Flightdeck.
 _Avoid_: Issue body
+
+**PRD**:
+A durable product requirements document saved in Flightdeck with a project-scoped public ID. It describes the problem, solution, user stories, implementation decisions, testing decisions, and scope boundaries for a planned body of work; a PRD may be draft, active, or archived, but it does not move through issue queues.
+_Avoid_: Parent issue, epic issue
+
+**Active PRD**:
+A PRD that is intended to be used as canonical source material for creating issues and providing agent context.
+_Avoid_: Ready issue, approved issue
+
+**User Story**:
+A numbered statement inside a PRD describing an actor, desired capability, and benefit. User stories can be referenced by issues, but they do not have independent workflow state.
+_Avoid_: Task, issue
+
+**User Story Reference**:
+A link from an issue to one or more numbered user stories in a PRD, showing which part of the PRD the issue covers.
+_Avoid_: Dependency, blocker
 
 **Agent Prompt**:
 A generated instruction packet copied from an issue and project context so an agent can execute or review work with the right constraints.
@@ -69,8 +89,8 @@ An agent prompt that asks an agent to execute an issue or an approved plan and m
 _Avoid_: Plan prompt
 
 **Issue Plan**:
-A durable document linked to an issue that describes how another agent should implement the issue. Complex issues should normally get an issue plan before implementation.
-_Avoid_: Issue body
+A durable implementation plan for one issue, created by a planning agent so a later implementation agent can execute the issue. It is distinct from a PRD, which provides product context and scope; complex issues should normally get an issue plan before implementation.
+_Avoid_: PRD, issue body
 
 **Review Queue**:
 The set of issues whose implementation is ready for user review.
@@ -85,11 +105,14 @@ _Avoid_: Blocked as a standalone status unless later decided
 **Docs vs Issues**:
 Documents are durable reference artifacts. Issues are actionable units of work that move through queues.
 
+**PRDs vs Issues**:
+PRDs provide durable product context and scope. Issues deliver actionable vertical slices and may reference the PRD user stories they cover. An issue references at most one PRD, and that PRD belongs to the same project as the issue.
+
 **Triage Role vs Workflow Status**:
 Flightdeck uses triage roles for pickup eligibility and workflow statuses for implementation/review lifecycle. Keep those concepts separate.
 
 **Issue Shape**:
-Flightdeck-compatible issue markdown uses `Parent`, `What to build`, `Acceptance criteria`, and `Blocked by` sections.
+Flightdeck-compatible issue markdown uses `Parent`, `What to build`, `Acceptance criteria`, and `Blocked by` sections, with optional PRD and user story references when the issue belongs to a PRD-backed body of work. `Parent` is reserved for issue hierarchy and must not be used as the PRD link.
 
 ## Example Dialogue
 
