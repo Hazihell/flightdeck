@@ -6,7 +6,13 @@ import { join } from "node:path";
 import { closeDatabase, openDatabase } from "../db/client.ts";
 import { createProject } from "../projects/repository.ts";
 import { setupInitializedHome } from "../testing/helpers.ts";
-import { createPrd, findPrdByPublicId, isValidPrdStatus } from "./repository.ts";
+import {
+  createPrd,
+  findPrdByPublicId,
+  isValidPrdStatus,
+  listPrds,
+  updatePrd,
+} from "./repository.ts";
 
 describe("prd repository", () => {
   test("allocates PRD sequences per project", async () => {
@@ -101,6 +107,75 @@ describe("prd repository", () => {
       });
 
       expect(prd.bodyMarkdown).toBe(body);
+    } finally {
+      closeDatabase(db);
+    }
+  });
+
+  test("lists PRDs by project and status", async () => {
+    const { env } = await setupInitializedHome();
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "LST", name: "List" });
+      createProject(db, { key: "OTH", name: "Other" });
+      const draft = createPrd(db, {
+        projectKey: "LST",
+        title: "Draft",
+        body: "# Draft",
+        status: "draft",
+      });
+      const active = createPrd(db, {
+        projectKey: "LST",
+        title: "Active",
+        body: "# Active",
+        status: "active",
+      });
+      createPrd(db, {
+        projectKey: "LST",
+        title: "Archived",
+        body: "# Archived",
+        status: "archived",
+      });
+      createPrd(db, {
+        projectKey: "OTH",
+        title: "Other",
+        body: "# Other",
+      });
+
+      expect(
+        listPrds(db, { projectKey: "LST", statuses: ["draft", "active"] }).map(
+          (prd) => prd.publicId,
+        ),
+      ).toEqual([draft.publicId, active.publicId]);
+      expect(listPrds(db, { projectKey: "LST", statuses: ["archived"] })).toHaveLength(1);
+    } finally {
+      closeDatabase(db);
+    }
+  });
+
+  test("updates a PRD without allocating a duplicate", async () => {
+    const { env } = await setupInitializedHome();
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "UPD", name: "Update" });
+      const prd = createPrd(db, {
+        projectKey: "UPD",
+        title: "Original",
+        body: "# Original",
+      });
+
+      const updated = updatePrd(db, prd.publicId, {
+        title: "Updated",
+        body: "# Updated",
+        status: "archived",
+      });
+
+      expect(updated.publicId).toBe(prd.publicId);
+      expect(updated.sequence).toBe(prd.sequence);
+      expect(updated.title).toBe("Updated");
+      expect(updated.bodyMarkdown).toBe("# Updated");
+      expect(updated.status).toBe("archived");
+      expect(listPrds(db, { projectKey: "UPD", statuses: ["archived"] })).toHaveLength(1);
     } finally {
       closeDatabase(db);
     }

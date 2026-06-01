@@ -20,7 +20,7 @@ import {
   runIssueUnblockBy,
   runIssueUpdate,
 } from "./issues/commands.ts";
-import { runPrdCreate, runPrdShow } from "./prds/commands.ts";
+import { runPrdCreate, runPrdList, runPrdShow, runPrdUpdate } from "./prds/commands.ts";
 import { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
 import { runSkillInstall, runSkillInstructions } from "./skills/commands.ts";
 
@@ -31,7 +31,9 @@ Usage:
   deck project add --key <KEY> --name <NAME> [--kind <KIND>] [--instructions <TEXT>]
   deck project path add --project <KEY> --path <PATH> [--kind <KIND>] [--label <LABEL>]
   deck prd create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--status draft|active|archived]
+  deck prd list [--project <KEY>] [--status draft|active|archived]
   deck prd show <PUBLIC_ID>
+  deck prd update <PUBLIC_ID> [--title <TITLE>] [--body <MARKDOWN_OR_PATH>] [--status draft|active|archived]
   deck issue create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--triage-role <ROLE>] [--workflow-status <STATUS>] [--complexity simple|needs-plan] [--blocked-by <PUBLIC_ID>] [--manual-blocker <TEXT>]
   deck issue list [--project <KEY>] [--status <STATUS>] [--triage-role <ROLE>]
   deck issue show <PUBLIC_ID>
@@ -67,6 +69,16 @@ type CliOutput =
     };
 
 function printHumanData(data: Record<string, unknown>): void {
+  if (Array.isArray(data.prds)) {
+    const prds = data.prds as Array<Record<string, unknown>>;
+    const count = typeof data.count === "number" ? data.count : prds.length;
+    console.log(`count: ${count}`);
+    for (const prd of prds) {
+      console.log(`${String(prd.publicId)}  ${String(prd.title)}  [${String(prd.status)}]`);
+    }
+    return;
+  }
+
   if (Array.isArray(data.issues)) {
     const issues = data.issues as Array<Record<string, unknown>>;
     const count = typeof data.count === "number" ? data.count : issues.length;
@@ -258,6 +270,24 @@ export async function runCli(
       }
     }
 
+    if (root === "prd" && sub === "list" && parsed.command.length === 2) {
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runPrdList(db, {
+          projectKey: flagString(flags, "project"),
+          cwd: process.cwd(),
+          status: flagString(flags, "status"),
+        });
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "prd list", data: result.data }
+          : { ok: false, command: "prd list", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
     if (root === "prd" && sub === "show" && parsed.command.length >= 2) {
       const publicId =
         parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
@@ -267,6 +297,27 @@ export async function runCli(
         const output: CliOutput = result.ok
           ? { ok: true, command: "prd show", data: result.data }
           : { ok: false, command: "prd show", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
+    if (root === "prd" && sub === "update" && parsed.command.length >= 2) {
+      const publicId =
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runPrdUpdate(db, {
+          publicId,
+          title: flagString(flags, "title"),
+          body: flagString(flags, "body"),
+          status: flagString(flags, "status"),
+        });
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "prd update", data: result.data }
+          : { ok: false, command: "prd update", error: result.error };
         printOutput(output, flags);
         return result.ok ? 0 : 1;
       } finally {

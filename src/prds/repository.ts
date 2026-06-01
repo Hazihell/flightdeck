@@ -105,10 +105,81 @@ export function createPrd(
   return prd;
 }
 
+export type PrdListFilters = {
+  projectKey?: string;
+  statuses?: PrdStatus[];
+};
+
+export function listPrds(db: Database, filters: PrdListFilters = {}): Prd[] {
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  if (filters.projectKey) {
+    const project = findProjectByKey(db, filters.projectKey);
+    if (!project) {
+      return [];
+    }
+    clauses.push("prds.project_id = ?");
+    params.push(project.id);
+  }
+
+  if (filters.statuses && filters.statuses.length > 0) {
+    clauses.push(`prds.status IN (${filters.statuses.map(() => "?").join(", ")})`);
+    params.push(...filters.statuses);
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const rows = db
+    .query<PrdRow, string[]>(
+      `SELECT prds.*
+       FROM prds
+       JOIN projects ON projects.id = prds.project_id
+       ${where}
+       ORDER BY projects.key ASC, prds.sequence ASC`,
+    )
+    .all(...params);
+  return rows.map(mapPrd);
+}
+
 export function findPrdByPublicId(db: Database, publicId: string): Prd | null {
   const normalized = publicId.trim().toUpperCase();
   const row = db.query<PrdRow, [string]>("SELECT * FROM prds WHERE public_id = ?").get(normalized);
   return row ? mapPrd(row) : null;
+}
+
+export function updatePrd(
+  db: Database,
+  publicId: string,
+  patch: {
+    title?: string;
+    body?: string;
+    status?: PrdStatus;
+  },
+): Prd {
+  const prd = findPrdByPublicId(db, publicId);
+  if (!prd) {
+    throw new PrdRepositoryError("prd_not_found", `PRD not found: ${publicId}`);
+  }
+
+  const updated: Prd = {
+    ...prd,
+    title: patch.title !== undefined ? patch.title.trim() : prd.title,
+    bodyMarkdown:
+      patch.body !== undefined ? resolveMarkdownBodyInput(patch.body) : prd.bodyMarkdown,
+    status: patch.status ?? prd.status,
+    updatedAt: nowIso(),
+  };
+
+  db.query(
+    `UPDATE prds SET
+      title = ?,
+      status = ?,
+      body_markdown = ?,
+      updated_at = ?
+     WHERE id = ?`,
+  ).run(updated.title, updated.status, updated.bodyMarkdown, updated.updatedAt, updated.id);
+
+  return updated;
 }
 
 export function getProjectKeyForPrd(db: Database, prd: Prd): string | null {

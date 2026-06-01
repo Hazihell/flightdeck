@@ -73,7 +73,9 @@ Create and inspect a project PRD:
 
 ```bash
 deck prd create --project OLA --title "Checkout flow" --body ./prd.md --json
+deck prd list --project OLA --json
 deck prd show OLA-PRD-1
+deck prd update OLA-PRD-1 --status archived --json
 ```
 
 See [docs/skill-adapter.md](./docs/skill-adapter.md) for the required issue body sections and [docs/agent-workflows.md](./docs/agent-workflows.md) for plan/implement/review flows.
@@ -86,7 +88,9 @@ See [docs/skill-adapter.md](./docs/skill-adapter.md) for the required issue body
 | `deck project add`        | Register a project                                                          |
 | `deck project path add`   | Register a filesystem path for a project                                    |
 | `deck prd create`         | Create a project PRD from inline markdown or a file                         |
+| `deck prd list`           | List draft and active PRDs, with optional status filtering                  |
 | `deck prd show`           | Show one PRD with metadata and markdown body                                |
+| `deck prd update`         | Update PRD title, markdown body, or status                                  |
 | `deck issue create`       | Create an issue (Flightdeck-compatible body)                                |
 | `deck issue list`         | List issues with optional filters                                           |
 | `deck issue show`         | Show one issue with parsed markdown fields                                  |
