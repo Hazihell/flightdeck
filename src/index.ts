@@ -64,8 +64,10 @@ export {
   addIssueDependency,
   createIssue,
   findIssueByPublicId,
+  findIssuePrdLinkByIssueId,
   formatPublicId,
   IssueRepositoryError,
+  linkIssueToPrd,
   listAllIssues,
   listBlockerIssues,
   listIssues,
@@ -78,6 +80,7 @@ export {
   type Complexity,
   type Issue,
   type ParsedIssueMarkdown,
+  type IssuePrdLink,
   PLAN_STATUSES,
   type PlanStatus,
   QUEUE_MODES,
@@ -94,6 +97,7 @@ export { runPrdCreate, runPrdList, runPrdShow, runPrdUpdate } from "./prds/comma
 export { extractPrdUserStories } from "./prds/markdown.ts";
 export {
   createPrd,
+  findPrdById,
   findPrdByPublicId,
   formatPrdPublicId,
   getProjectKeyForPrd,

@@ -147,6 +147,11 @@ export function findPrdByPublicId(db: Database, publicId: string): Prd | null {
   return row ? mapPrd(row) : null;
 }
 
+export function findPrdById(db: Database, id: string): Prd | null {
+  const row = db.query<PrdRow, [string]>("SELECT * FROM prds WHERE id = ?").get(id);
+  return row ? mapPrd(row) : null;
+}
+
 export function updatePrd(
   db: Database,
   publicId: string,

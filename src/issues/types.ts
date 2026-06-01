@@ -73,6 +73,15 @@ export type IssueDependency = {
   createdAt: string;
 };
 
+export type IssuePrdLink = {
+  id: string;
+  issueId: string;
+  prdId: string;
+  userStoryNumbers: number[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ParsedIssueMarkdown = {
   parent: string | null;
   whatToBuild: string | null;

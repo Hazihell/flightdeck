@@ -6,13 +6,14 @@ import { join } from "node:path";
 import { closeDatabase, openDatabase } from "../db/client.ts";
 import {
   createIssue,
+  createPrd,
   findIssueByPublicId,
   isIssueUnblocked,
   listBlockerIssues,
   listIssues,
 } from "../index.ts";
 import { addProjectPath, createProject } from "../projects/repository.ts";
-import { runDeck, setupInitializedHome, spawnDeckJson } from "../testing/helpers.ts";
+import { runDeck, setupInitializedHome, spawnDeck, spawnDeckJson } from "../testing/helpers.ts";
 
 describe("issue commands", () => {
   test("creates issues with per-project public IDs", async () => {
@@ -738,6 +739,267 @@ None - can start immediately`;
     expect(response.ok).toBe(true);
     if (response.ok) {
       expect(response.data.dependencyBlockers[0]?.publicId).toBe("DEP-1");
+    }
+  });
+
+  test("creates issue with linked PRD user stories and preserves body markdown exactly", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "PRD", name: "PRD links" });
+      createPrd(db, {
+        projectKey: "PRD",
+        title: "Checkout PRD",
+        body: `# Checkout
+
+## User Stories
+
+1. As a buyer, I want to save my cart.
+2. As a buyer, I want to pay with a card.
+3. As an operator, I want settlement visibility.
+`,
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `## Parent
+
+PRD-0
+
+## What to build
+
+Create the payment slice.
+
+## Blocked by
+
+None - can start immediately
+`;
+
+    const { exitCode, response } = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: {
+        publicId: string;
+        projectKey: string;
+        title: string;
+        status: string;
+        userStoryNumbers: number[];
+        userStories: Array<{ number: number; text: string | null }>;
+        missingUserStoryNumbers: number[];
+      };
+    }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "PRD",
+        "--title",
+        "Payment slice",
+        "--body",
+        body,
+        "--prd",
+        "PRD-PRD-1",
+        "--user-stories",
+        "1,3",
+      ],
+      env,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.bodyMarkdown).toBe(body);
+      expect(response.data.linkedPrd.publicId).toBe("PRD-PRD-1");
+      expect(response.data.linkedPrd.projectKey).toBe("PRD");
+      expect(response.data.linkedPrd.title).toBe("Checkout PRD");
+      expect(response.data.linkedPrd.status).toBe("active");
+      expect(response.data.linkedPrd.userStoryNumbers).toEqual([1, 3]);
+      expect(response.data.linkedPrd.userStories).toEqual([
+        { number: 1, text: "As a buyer, I want to save my cart." },
+        { number: 3, text: "As an operator, I want settlement visibility." },
+      ]);
+      expect(response.data.linkedPrd.missingUserStoryNumbers).toEqual([]);
+    }
+  });
+
+  test("rejects cross-project PRD links on issue creation", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "AAA", name: "One" });
+      createProject(db, { key: "BBB", name: "Two" });
+      createPrd(db, {
+        projectKey: "AAA",
+        title: "Wrong project",
+        body: "# Wrong",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson(
+      [
+        "issue",
+        "create",
+        "--project",
+        "BBB",
+        "--title",
+        "Should fail",
+        "--body",
+        "## What to build\n\nNo cross-project links",
+        "--prd",
+        "AAA-PRD-1",
+      ],
+      env,
+    );
+
+    expect(exitCode).toBe(1);
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.error.code).toBe("prd_project_mismatch");
+    }
+
+    const listResult = spawnDeckJson<{ count: number; issues: Array<{ publicId: string }> }>(
+      ["issue", "list", "--project", "BBB"],
+      env,
+    );
+    expect(listResult.exitCode).toBe(0);
+    expect(listResult.response.ok).toBe(true);
+    if (listResult.response.ok) {
+      expect(listResult.response.data.count).toBe(0);
+      expect(listResult.response.data.issues).toEqual([]);
+    }
+  });
+
+  test("allows archived PRD links with visible warning", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "ARC", name: "Archived" });
+      createPrd(db, {
+        projectKey: "ARC",
+        title: "Old PRD",
+        body: "# Old\n\n## User Stories\n\n1. As a user, I want old context.",
+        status: "archived",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson<{
+      linkedPrd: { publicId: string; status: string };
+      warnings: Array<{ code: string; message: string }>;
+    }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "ARC",
+        "--title",
+        "Historical slice",
+        "--body",
+        "## What to build\n\nUse archived context",
+        "--prd",
+        "ARC-PRD-1",
+        "--user-stories",
+        "1",
+      ],
+      env,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.linkedPrd).toMatchObject({
+        publicId: "ARC-PRD-1",
+        status: "archived",
+      });
+      expect(response.data.warnings).toEqual([
+        { code: "archived_prd", message: "Linked PRD ARC-PRD-1 is archived" },
+      ]);
+    }
+
+    const human = spawnDeck(
+      [
+        "issue",
+        "create",
+        "--project",
+        "ARC",
+        "--title",
+        "Human warning",
+        "--body",
+        "## What to build\n\nShow warning",
+        "--prd",
+        "ARC-PRD-1",
+      ],
+      env,
+    );
+    expect(human.exitCode).toBe(0);
+    expect(human.stderr).toContain("warning: Linked PRD ARC-PRD-1 is archived");
+  });
+
+  test("keeps PRD links separate from blockers and parent metadata", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "SEP", name: "Separate" });
+      createIssue(db, {
+        projectKey: "SEP",
+        title: "Blocker",
+        body: "## What to build\n\nBlocker",
+        workflowStatus: "backlog",
+      });
+      createPrd(db, {
+        projectKey: "SEP",
+        title: "Separate PRD",
+        body: "# Separate\n\n## User Stories\n\n1. As a user, I want separation.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    expect(
+      await runDeck(
+        [
+          "issue",
+          "create",
+          "--project",
+          "SEP",
+          "--title",
+          "Dependent slice",
+          "--body",
+          "## Parent\n\nSEP-999\n\n## What to build\n\nWork\n\n## Blocked by\n\nSEP-1",
+          "--blocked-by",
+          "SEP-1",
+          "--prd",
+          "SEP-PRD-1",
+          "--user-stories",
+          "1",
+          "--json",
+        ],
+        isolated,
+      ),
+    ).toBe(0);
+
+    const { response } = spawnDeckJson<{
+      parsed: { parent: string | null; dependencyPublicIds: string[] };
+      dependencyBlockers: Array<{ publicId: string }>;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(["issue", "show", "SEP-2"], env);
+
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.parsed.parent).toBe("SEP-999");
+      expect(response.data.parsed.dependencyPublicIds).toEqual(["SEP-1"]);
+      expect(response.data.dependencyBlockers.map((blocker) => blocker.publicId)).toEqual([
+        "SEP-1",
+      ]);
+      expect(response.data.linkedPrd.publicId).toBe("SEP-PRD-1");
+      expect(response.data.linkedPrd.userStoryNumbers).toEqual([1]);
     }
   });
 });

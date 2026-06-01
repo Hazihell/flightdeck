@@ -2,7 +2,7 @@
 
 SQLite database at `$FLIGHTDECK_HOME/flightdeck.sqlite` (default `~/Flightdeck/flightdeck.sqlite`). Issue bodies and comments are stored as markdown text in SQLite. Attached long-form artifacts such as implementation plans are markdown files under the Flightdeck home, with metadata and issue links indexed in SQLite.
 
-Current schema version: **4**.
+Current schema version: **5**.
 
 ## Tables
 
@@ -106,6 +106,19 @@ Unique: `(issue_id, blocker_issue_id)`.
 
 `deck issue create` and `deck issue update --body` add structured dependencies when `## Blocked by` lists resolvable issue public IDs. `deck issue update --body` does not remove existing dependencies when that section changes — use `deck issue unblock-by` to drop a structured blocker.
 
+### `issue_prd_links`
+
+| Column            | Type                  | Notes                                       |
+| ----------------- | --------------------- | ------------------------------------------- |
+| `id`              | TEXT PK               | UUID                                        |
+| `issue_id`        | TEXT FK → `issues.id` | Linked issue                                |
+| `prd_id`          | TEXT FK → `prds.id`   | Linked same-project PRD                     |
+| `user_story_refs` | TEXT                  | JSON array of numeric user story references |
+| `created_at`      | TEXT                  |                                             |
+| `updated_at`      | TEXT                  |                                             |
+
+Unique: `(issue_id)` — an issue can link to at most one PRD. Parent issues, blockers, and issue plan documents remain separate relationships.
+
 ### `issue_comments`
 
 | Column          | Type                  | Notes        |
@@ -147,6 +160,7 @@ projects 1──* prds
 projects 1──1 project_issue_sequences
 projects 1──1 project_prd_sequences
 issues *──* issues  (via issue_dependencies: dependent → blocker)
+issues 1──0..1 prds  (via issue_prd_links)
 issues 1──* issue_comments
 issues 1──0..1 documents  (via issue_document_links, link_kind=plan)
 ```
