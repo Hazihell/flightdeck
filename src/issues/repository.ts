@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 
 import type { Database } from "../db/client.ts";
+import { resolveMarkdownBodyInput } from "../markdown-body.ts";
 import { findProjectById, findProjectByKey } from "../projects/repository.ts";
 import { nowIso } from "../time.ts";
 import { DEFAULT_ISSUE_BODY, parseIssueMarkdown } from "./markdown.ts";
@@ -91,14 +91,7 @@ function mapDependency(row: DependencyRow): IssueDependency {
 }
 
 export function resolveBodyInput(body: string): string {
-  const trimmed = body.trim();
-  if (!trimmed) {
-    return DEFAULT_ISSUE_BODY;
-  }
-  if (existsSync(trimmed)) {
-    return readFileSync(trimmed, "utf8");
-  }
-  return body;
+  return resolveMarkdownBodyInput(body, DEFAULT_ISSUE_BODY);
 }
 
 function allocateSequence(db: Database, projectId: string): number {

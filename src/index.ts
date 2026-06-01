@@ -29,6 +29,7 @@ export {
   resolveFlightdeckHome,
 } from "./home.ts";
 export { initFlightdeck } from "./init.ts";
+export { resolveMarkdownBodyInput } from "./markdown-body.ts";
 export {
   runIssueApprovePlan,
   runIssueAttachPlan,
@@ -89,6 +90,16 @@ export {
 } from "./issues/types.ts";
 export { isIssueUnblocked } from "./issues/unblocked.ts";
 export { moveIssue, WorkflowError } from "./issues/workflow.ts";
+export { runPrdCreate, runPrdShow } from "./prds/commands.ts";
+export {
+  createPrd,
+  findPrdByPublicId,
+  formatPrdPublicId,
+  getProjectKeyForPrd,
+  isValidPrdStatus,
+  PrdRepositoryError,
+} from "./prds/repository.ts";
+export { DEFAULT_PRD_STATUS, type Prd, PRD_STATUSES, type PrdStatus } from "./prds/types.ts";
 export { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
 export { normalizePath, pathMatchesPrefix } from "./projects/paths.ts";
 export {

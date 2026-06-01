@@ -2,7 +2,7 @@
 
 SQLite database at `$FLIGHTDECK_HOME/flightdeck.sqlite` (default `~/Flightdeck/flightdeck.sqlite`). Issue bodies and comments are stored as markdown text in SQLite. Attached long-form artifacts such as implementation plans are markdown files under the Flightdeck home, with metadata and issue links indexed in SQLite.
 
-Current schema version: **3**.
+Current schema version: **4**.
 
 ## Tables
 
@@ -44,6 +44,13 @@ Current schema version: **3**.
 | `project_id`    | TEXT PK FK → `projects.id` |                            |
 | `next_sequence` | INTEGER                    | Next issue sequence number |
 
+### `project_prd_sequences`
+
+| Column          | Type                       | Notes                    |
+| --------------- | -------------------------- | ------------------------ |
+| `project_id`    | TEXT PK FK → `projects.id` |                          |
+| `next_sequence` | INTEGER                    | Next PRD sequence number |
+
 ### `issues`
 
 | Column               | Type                    | Notes                                      |
@@ -67,6 +74,22 @@ Current schema version: **3**.
 | `commit_ref`         | TEXT                    | Optional                                   |
 | `created_at`         | TEXT                    |                                            |
 | `updated_at`         | TEXT                    |                                            |
+
+Unique: `(project_id, sequence)`.
+
+### `prds`
+
+| Column          | Type                    | Notes                                              |
+| --------------- | ----------------------- | -------------------------------------------------- |
+| `id`            | TEXT PK                 | UUID                                               |
+| `public_id`     | TEXT UNIQUE             | Project-prefixed PRD ID (for example `OLA-PRD-1`)  |
+| `project_id`    | TEXT FK → `projects.id` |                                                    |
+| `sequence`      | INTEGER                 | Per-project PRD sequence                           |
+| `title`         | TEXT                    |                                                    |
+| `status`        | TEXT                    | `draft`, `active`, or `archived`; default `active` |
+| `body_markdown` | TEXT                    | PRD markdown body                                  |
+| `created_at`    | TEXT                    |                                                    |
+| `updated_at`    | TEXT                    |                                                    |
 
 Unique: `(project_id, sequence)`.
 
@@ -120,13 +143,23 @@ Unique: `(issue_id, link_kind)` — one plan document per issue.
 ```text
 projects 1──* project_paths
 projects 1──* issues
+projects 1──* prds
 projects 1──1 project_issue_sequences
+projects 1──1 project_prd_sequences
 issues *──* issues  (via issue_dependencies: dependent → blocker)
 issues 1──* issue_comments
 issues 1──0..1 documents  (via issue_document_links, link_kind=plan)
 ```
 
 ## Enums
+
+### PRD statuses (`prds.status`)
+
+| Value      | Meaning                          |
+| ---------- | -------------------------------- |
+| `draft`    | Draft PRD, not yet active        |
+| `active`   | Default; current source of truth |
+| `archived` | Historical PRD                   |
 
 ### Triage roles (`issues.triage_role`)
 

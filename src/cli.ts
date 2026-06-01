@@ -20,6 +20,7 @@ import {
   runIssueUnblockBy,
   runIssueUpdate,
 } from "./issues/commands.ts";
+import { runPrdCreate, runPrdShow } from "./prds/commands.ts";
 import { runProjectAdd, runProjectPathAdd } from "./projects/commands.ts";
 import { runSkillInstall, runSkillInstructions } from "./skills/commands.ts";
 
@@ -29,6 +30,8 @@ Usage:
   deck init
   deck project add --key <KEY> --name <NAME> [--kind <KIND>] [--instructions <TEXT>]
   deck project path add --project <KEY> --path <PATH> [--kind <KIND>] [--label <LABEL>]
+  deck prd create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--status draft|active|archived]
+  deck prd show <PUBLIC_ID>
   deck issue create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--triage-role <ROLE>] [--workflow-status <STATUS>] [--complexity simple|needs-plan] [--blocked-by <PUBLIC_ID>] [--manual-blocker <TEXT>]
   deck issue list [--project <KEY>] [--status <STATUS>] [--triage-role <ROLE>]
   deck issue show <PUBLIC_ID>
@@ -94,7 +97,24 @@ function printHumanData(data: Record<string, unknown>): void {
     return;
   }
 
-  if (data.bodyMarkdown !== undefined) {
+  // Output payloads are discriminated by `kind` (e.g. "issue", "prd").
+  // Any new body-bearing output must set `kind` or it falls through to the
+  // generic key/value dump at the end of this function.
+  if (data.kind === "prd") {
+    console.log(`publicId: ${String(data.publicId)}`);
+    console.log(`title: ${String(data.title)}`);
+    console.log(
+      `status: ${typeof data.status === "string" ? data.status : JSON.stringify(data.status)}`,
+    );
+    console.log(`projectKey: ${String(data.projectKey)}`);
+    console.log("");
+    if (typeof data.bodyMarkdown === "string") {
+      console.log(data.bodyMarkdown);
+    }
+    return;
+  }
+
+  if (data.kind === "issue" && data.bodyMarkdown !== undefined) {
     console.log(`publicId: ${String(data.publicId)}`);
     console.log(`title: ${String(data.title)}`);
     console.log(`triageRole: ${String(data.triageRole)}`);
@@ -211,6 +231,42 @@ export async function runCli(
         const output: CliOutput = result.ok
           ? { ok: true, command: "project path add", data: result.data }
           : { ok: false, command: "project path add", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
+    if (root === "prd" && sub === "create" && parsed.command.length === 2) {
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runPrdCreate(db, {
+          projectKey: flagString(flags, "project"),
+          cwd: process.cwd(),
+          title: flagString(flags, "title") ?? "",
+          body: flagString(flags, "body"),
+          status: flagString(flags, "status"),
+        });
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "prd create", data: result.data }
+          : { ok: false, command: "prd create", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
+    if (root === "prd" && sub === "show" && parsed.command.length >= 2) {
+      const publicId =
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runPrdShow(db, publicId);
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "prd show", data: result.data }
+          : { ok: false, command: "prd show", error: result.error };
         printOutput(output, flags);
         return result.ok ? 0 : 1;
       } finally {
