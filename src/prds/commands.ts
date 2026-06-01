@@ -2,14 +2,19 @@ import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
 import type { CommandResult } from "../projects/commands.ts";
 import { inferProjectFromCwd } from "../projects/repository.ts";
+import { extractPrdUserStories } from "./markdown.ts";
 import {
   createPrd,
   findPrdByPublicId,
   getProjectKeyForPrd,
   isValidPrdStatus,
+  listPrds,
   PrdRepositoryError,
+  updatePrd,
 } from "./repository.ts";
-import type { Prd } from "./types.ts";
+import { DEFAULT_PRD_STATUS, type Prd, type PrdStatus } from "./types.ts";
+
+const DEFAULT_LIST_STATUSES: PrdStatus[] = ["draft", DEFAULT_PRD_STATUS];
 
 export function runPrdCreate(
   db: Database,
@@ -81,6 +86,107 @@ export function runPrdShow(db: Database, publicId: string): CommandResult {
   return { ok: true, data: prdToOutput(db, prd) };
 }
 
+export function runPrdList(
+  db: Database,
+  input: {
+    projectKey?: string;
+    cwd: string;
+    status?: string;
+  },
+): CommandResult {
+  if (input.status && !isValidPrdStatus(input.status)) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: `Invalid PRD status: ${input.status}` },
+    };
+  }
+
+  const projectKey = resolveProjectKey(db, input.projectKey, input.cwd);
+  if (!projectKey.ok) {
+    return { ok: false, error: projectKey.error };
+  }
+
+  const statuses = input.status ? [input.status as PrdStatus] : DEFAULT_LIST_STATUSES;
+  const prds = listPrds(db, {
+    projectKey: projectKey.key,
+    statuses,
+  });
+
+  return {
+    ok: true,
+    data: {
+      kind: "prdList",
+      count: prds.length,
+      filters: {
+        projectKey: projectKey.key,
+        statuses,
+      },
+      prds: prds.map((prd) => prdToOutput(db, prd)),
+    },
+  };
+}
+
+export function runPrdUpdate(
+  db: Database,
+  input: {
+    publicId: string;
+    title?: string;
+    body?: string;
+    status?: string;
+  },
+): CommandResult {
+  if (!input.publicId.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing PRD public ID" },
+    };
+  }
+
+  if (input.title !== undefined && !input.title.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing value for flag: --title" },
+    };
+  }
+
+  if (input.body !== undefined && !input.body.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing value for flag: --body" },
+    };
+  }
+
+  if (input.status !== undefined && !isValidPrdStatus(input.status)) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: `Invalid PRD status: ${input.status}` },
+    };
+  }
+
+  if (input.title === undefined && input.body === undefined && input.status === undefined) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: "Provide at least one of --title, --body, or --status",
+      },
+    };
+  }
+
+  try {
+    const prd = withTransaction(db, () =>
+      updatePrd(db, input.publicId, {
+        title: input.title,
+        body: input.body,
+        status: input.status as PrdStatus | undefined,
+      }),
+    );
+    return { ok: true, data: prdToOutput(db, prd) };
+  } catch (error) {
+    return repositoryErrorToResult(error);
+  }
+}
+
 function resolveProjectKey(
   db: Database,
   projectKey: string | undefined,
@@ -115,6 +221,7 @@ function prdToOutput(db: Database, prd: Prd): Record<string, unknown> {
     title: prd.title,
     status: prd.status,
     bodyMarkdown: prd.bodyMarkdown,
+    userStories: extractPrdUserStories(prd.bodyMarkdown),
     createdAt: prd.createdAt,
     updatedAt: prd.updatedAt,
   };

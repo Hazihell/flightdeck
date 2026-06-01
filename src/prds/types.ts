@@ -15,3 +15,8 @@ export type Prd = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type PrdUserStory = {
+  number: number;
+  text: string;
+};
