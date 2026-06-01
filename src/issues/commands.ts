@@ -661,11 +661,7 @@ export async function runIssuePrompt(
   };
 }
 
-function resolveRepositoryPath(
-  db: Database,
-  issue: Issue,
-  overridePath?: string,
-): string | null {
+function resolveRepositoryPath(db: Database, issue: Issue, overridePath?: string): string | null {
   if (overridePath?.trim()) {
     return overridePath.trim();
   }
@@ -715,6 +711,7 @@ function issueToOutput(db: Database, issue: Issue): Record<string, unknown> {
 
 function issueSummaryToOutput(db: Database, issue: Issue): Record<string, unknown> {
   return {
+    kind: "issue",
     id: issue.id,
     publicId: issue.publicId,
     projectId: issue.projectId,

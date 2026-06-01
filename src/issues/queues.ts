@@ -39,11 +39,7 @@ function planStatusEligibleForPlan(planStatus: PlanStatus): boolean {
   return planStatus === "none" || planStatus === "changes-requested";
 }
 
-export function selectNextIssue(
-  db: Database,
-  mode: QueueMode,
-  projectKey?: string,
-): Issue | null {
+export function selectNextIssue(db: Database, mode: QueueMode, projectKey?: string): Issue | null {
   const candidates = listIssues(db, {
     projectKey,
   }).filter((issue) => matchesQueueMode(db, issue, mode));
