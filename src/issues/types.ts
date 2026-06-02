@@ -89,4 +89,6 @@ export type ParsedIssueMarkdown = {
   blockedByRaw: string | null;
   dependencyPublicIds: string[];
   manualBlockerFromMarkdown: string | null;
+  prdPublicIdFromMarkdown: string | null;
+  userStoryNumbersFromMarkdown: number[];
 };

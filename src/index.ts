@@ -35,6 +35,7 @@ export {
   runIssueBlockBy,
   runIssueComment,
   runIssueCreate,
+  runIssueLinkPrd,
   runIssueList,
   runIssueMove,
   runIssueNext,
@@ -42,6 +43,7 @@ export {
   runIssueRequestPlanChanges,
   runIssueShow,
   runIssueUnblockBy,
+  runIssueUnlinkPrd,
   runIssueUpdate,
 } from "./issues/commands.ts";
 export { addIssueComment, listIssueComments } from "./issues/comments.ts";
@@ -69,6 +71,7 @@ export {
   IssueRepositoryError,
   linkIssueToPrd,
   listAllIssues,
+  unlinkIssueFromPrd,
   listBlockerIssues,
   listIssues,
   removeIssueDependency,

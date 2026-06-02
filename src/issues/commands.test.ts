@@ -1002,4 +1002,355 @@ None - can start immediately
       expect(response.data.linkedPrd.userStoryNumbers).toEqual([1]);
     }
   });
+
+  test("issue link-prd links an existing issue to a same-project PRD", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "LNK", name: "Link" });
+      createIssue(db, {
+        projectKey: "LNK",
+        title: "Existing slice",
+        body: "## What to build\n\nBackfill link",
+      });
+      createPrd(db, {
+        projectKey: "LNK",
+        title: "Link PRD",
+        body: "# Link\n\n## User Stories\n\n1. As a user, I want linking.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson<{
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(["issue", "link-prd", "LNK-1", "--prd", "LNK-PRD-1", "--user-stories", "1", "--json"], env);
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.linkedPrd.publicId).toBe("LNK-PRD-1");
+      expect(response.data.linkedPrd.userStoryNumbers).toEqual([1]);
+    }
+  });
+
+  test("issue link-prd corrects an existing PRD link on rerun", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "REL", name: "Relink" });
+      createIssue(db, {
+        projectKey: "REL",
+        title: "Relink slice",
+        body: "## What to build\n\nRelink body",
+      });
+      createPrd(db, {
+        projectKey: "REL",
+        title: "First PRD",
+        body: "# First\n\n## User Stories\n\n1. First story.",
+      });
+      createPrd(db, {
+        projectKey: "REL",
+        title: "Second PRD",
+        body: "# Second\n\n## User Stories\n\n1. Second story.\n2. Another story.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    expect(
+      await runDeck(
+        ["issue", "link-prd", "REL-1", "--prd", "REL-PRD-1", "--user-stories", "1", "--json"],
+        isolated,
+      ),
+    ).toBe(0);
+
+    const relinked = spawnDeckJson<{
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(
+      ["issue", "link-prd", "REL-1", "--prd", "REL-PRD-2", "--user-stories", "1,2", "--json"],
+      env,
+    );
+
+    expect(relinked.exitCode).toBe(0);
+    expect(relinked.response.ok).toBe(true);
+    if (relinked.response.ok) {
+      expect(relinked.response.data.linkedPrd.publicId).toBe("REL-PRD-2");
+      expect(relinked.response.data.linkedPrd.userStoryNumbers).toEqual([1, 2]);
+    }
+  });
+
+  test("issue unlink-prd removes structured link and preserves body markdown", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const body = `## What to build
+
+Keep this body intact.
+
+## PRD
+
+LNK-PRD-1
+`;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "ULK", name: "Unlink" });
+      createPrd(db, {
+        projectKey: "ULK",
+        title: "Unlink PRD",
+        body: "# Unlink",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    expect(
+      await runDeck(
+        [
+          "issue",
+          "create",
+          "--project",
+          "ULK",
+          "--title",
+          "Unlink me",
+          "--body",
+          body,
+          "--prd",
+          "ULK-PRD-1",
+          "--json",
+        ],
+        isolated,
+      ),
+    ).toBe(0);
+
+    const unlinked = spawnDeckJson<{ bodyMarkdown: string; linkedPrd: null }>(
+      ["issue", "unlink-prd", "ULK-1", "--json"],
+      env,
+    );
+
+    expect(unlinked.exitCode).toBe(0);
+    expect(unlinked.response.ok).toBe(true);
+    if (unlinked.response.ok) {
+      expect(unlinked.response.data.linkedPrd).toBeNull();
+      expect(unlinked.response.data.bodyMarkdown).toBe(body);
+    }
+  });
+
+  test("issue create parses PRD and user story sections from markdown", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "MD", name: "Markdown" });
+      createPrd(db, {
+        projectKey: "MD",
+        title: "Markdown PRD",
+        body: "# Markdown\n\n## User Stories\n\n1. First.\n2. Second.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `## What to build
+
+From markdown sections.
+
+## PRD
+
+MD-PRD-1
+
+## User stories
+
+1, 2
+`;
+
+    const { exitCode, response } = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(
+      ["issue", "create", "--project", "MD", "--title", "Markdown link", "--body", body, "--json"],
+      env,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.bodyMarkdown).toBe(body);
+      expect(response.data.linkedPrd.publicId).toBe("MD-PRD-1");
+      expect(response.data.linkedPrd.userStoryNumbers).toEqual([1, 2]);
+    }
+  });
+
+  test("issue create flags override conflicting PRD markdown sections", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "OVR", name: "Override" });
+      createPrd(db, {
+        projectKey: "OVR",
+        title: "Markdown PRD",
+        body: "# Markdown\n\n## User Stories\n\n1. One.",
+      });
+      createPrd(db, {
+        projectKey: "OVR",
+        title: "Flag PRD",
+        body: "# Flag\n\n## User Stories\n\n1. One.\n3. Three.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `## What to build
+
+Override precedence.
+
+## PRD
+
+OVR-PRD-1
+
+## User stories
+
+9
+`;
+
+    const { exitCode, response } = spawnDeckJson<{
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "OVR",
+        "--title",
+        "Override link",
+        "--body",
+        body,
+        "--prd",
+        "OVR-PRD-2",
+        "--user-stories",
+        "1,3",
+        "--json",
+      ],
+      env,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.linkedPrd.publicId).toBe("OVR-PRD-2");
+      expect(response.data.linkedPrd.userStoryNumbers).toEqual([1, 3]);
+    }
+  });
+
+  test("missing user stories warn and appear in linkedPrd.missingUserStoryNumbers", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "MIS", name: "Missing" });
+      createIssue(db, {
+        projectKey: "MIS",
+        title: "Missing refs",
+        body: "## What to build\n\nMissing story refs",
+      });
+      createPrd(db, {
+        projectKey: "MIS",
+        title: "Missing PRD",
+        body: "# Missing\n\n## User Stories\n\n1. Only one story.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson<{
+      linkedPrd: { publicId: string; missingUserStoryNumbers: number[] };
+      warnings: Array<{ code: string; message: string }>;
+    }>(
+      ["issue", "link-prd", "MIS-1", "--prd", "MIS-PRD-1", "--user-stories", "1,7", "--json"],
+      env,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.linkedPrd.missingUserStoryNumbers).toEqual([7]);
+      expect(response.data.warnings).toEqual([
+        {
+          code: "missing_user_stories",
+          message: "PRD MIS-PRD-1 is missing user story reference(s): 7",
+        },
+      ]);
+    }
+  });
+
+  test("archived PRD link through issue link-prd warns", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "ARL", name: "Archived link" });
+      createIssue(db, {
+        projectKey: "ARL",
+        title: "Archived target",
+        body: "## What to build\n\nArchived link",
+      });
+      createPrd(db, {
+        projectKey: "ARL",
+        title: "Archived PRD",
+        body: "# Archived",
+        status: "archived",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson<{
+      linkedPrd: { status: string };
+      warnings: Array<{ code: string; message: string }>;
+    }>(["issue", "link-prd", "ARL-1", "--prd", "ARL-PRD-1", "--json"], env);
+
+    expect(exitCode).toBe(0);
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.data.linkedPrd.status).toBe("archived");
+      expect(response.data.warnings).toEqual([
+        { code: "archived_prd", message: "Linked PRD ARL-PRD-1 is archived" },
+      ]);
+    }
+  });
+
+  test("cross-project link through issue link-prd fails with prd_project_mismatch", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "XAA", name: "Cross A" });
+      createProject(db, { key: "XBB", name: "Cross B" });
+      createIssue(db, {
+        projectKey: "XBB",
+        title: "Cross issue",
+        body: "## What to build\n\nCross project",
+      });
+      createPrd(db, {
+        projectKey: "XAA",
+        title: "Cross PRD",
+        body: "# Cross",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const { exitCode, response } = spawnDeckJson(
+      ["issue", "link-prd", "XBB-1", "--prd", "XAA-PRD-1", "--json"],
+      env,
+    );
+
+    expect(exitCode).toBe(1);
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.error.code).toBe("prd_project_mismatch");
+    }
+  });
 });

@@ -463,12 +463,30 @@ export function linkIssueToPrd(
     );
   }
 
+  const normalizedNumbers = normalizeUserStoryNumbers(userStoryNumbers);
+  const existing = findIssuePrdLinkByIssueId(db, issue.id);
   const timestamp = nowIso();
+
+  if (existing) {
+    db.query(
+      `UPDATE issue_prd_links
+       SET prd_id = ?, user_story_refs = ?, updated_at = ?
+       WHERE issue_id = ?`,
+    ).run(prd.id, JSON.stringify(normalizedNumbers), timestamp, issue.id);
+
+    return {
+      ...existing,
+      prdId: prd.id,
+      userStoryNumbers: normalizedNumbers,
+      updatedAt: timestamp,
+    };
+  }
+
   const link: IssuePrdLink = {
     id: randomUUID(),
     issueId: issue.id,
     prdId: prd.id,
-    userStoryNumbers: normalizeUserStoryNumbers(userStoryNumbers),
+    userStoryNumbers: normalizedNumbers,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -487,6 +505,15 @@ export function linkIssueToPrd(
   );
 
   return link;
+}
+
+export function unlinkIssueFromPrd(db: Database, issuePublicId: string): void {
+  const issue = findIssueByPublicId(db, issuePublicId);
+  if (!issue) {
+    throw new IssueRepositoryError("issue_not_found", `Issue not found: ${issuePublicId}`);
+  }
+
+  db.query("DELETE FROM issue_prd_links WHERE issue_id = ?").run(issue.id);
 }
 
 export function findIssuePrdLinkByIssueId(db: Database, issueId: string): IssuePrdLink | null {

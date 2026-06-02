@@ -43,12 +43,12 @@ The issue JSON response includes `data.linkedPrd.publicId`, `data.linkedPrd.user
 
 `Parent`, `Blocked by`, PRDs, and Issue Plans are distinct relationships:
 
-| Relationship | Stored as | Meaning |
-| ------------ | --------- | ------- |
-| `Parent` | Issue markdown metadata | Issue hierarchy or source grouping. It is not the PRD link. |
-| `Blocked by` / `--blocked-by` | `issue_dependencies` rows | Execution ordering between issues. It is not product context. |
-| `--prd` / `--user-stories` | `issue_prd_links` row | Product context and user story traceability for a slice. |
-| Issue Plan | `documents` + `issue_document_links` with `link_kind=plan` | Implementation guidance for one issue after planning. |
+| Relationship                  | Stored as                                                  | Meaning                                                       |
+| ----------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `Parent`                      | Issue markdown metadata                                    | Issue hierarchy or source grouping. It is not the PRD link.   |
+| `Blocked by` / `--blocked-by` | `issue_dependencies` rows                                  | Execution ordering between issues. It is not product context. |
+| `--prd` / `--user-stories`    | `issue_prd_links` row                                      | Product context and user story traceability for a slice.      |
+| Issue Plan                    | `documents` + `issue_document_links` with `link_kind=plan` | Implementation guidance for one issue after planning.         |
 
 An issue can link to at most one same-project PRD. PRDs remain project records with statuses (`draft`, `active`, `archived`); they do not move through issue queues.
 
@@ -141,8 +141,14 @@ deck issue create \
       "status": "active",
       "userStoryNumbers": [3, 7],
       "userStories": [
-        { "number": 3, "text": "As a shopper, I want card errors before submit, so that I can correct them quickly." },
-        { "number": 7, "text": "As a shopper, I want failed payment attempts explained, so that I know what to do next." }
+        {
+          "number": 3,
+          "text": "As a shopper, I want card errors before submit, so that I can correct them quickly."
+        },
+        {
+          "number": 7,
+          "text": "As a shopper, I want failed payment attempts explained, so that I know what to do next."
+        }
       ],
       "missingUserStoryNumbers": []
     }

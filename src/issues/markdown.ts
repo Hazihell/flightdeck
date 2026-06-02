@@ -1,6 +1,16 @@
 import type { ParsedIssueMarkdown } from "./types.ts";
 
-const SECTION_HEADERS = ["Parent", "What to build", "Acceptance criteria", "Blocked by"] as const;
+const SECTION_HEADERS = [
+  "Parent",
+  "What to build",
+  "Acceptance criteria",
+  "Blocked by",
+  "PRD",
+  "User stories",
+  "User Stories",
+] as const;
+
+const PRD_PUBLIC_ID_PATTERN = /\b([A-Z][A-Z0-9]*-PRD-\d+)\b/;
 
 export const PUBLIC_ID_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
 
@@ -25,6 +35,8 @@ export function parseIssueMarkdown(bodyMarkdown: string): ParsedIssueMarkdown {
   const acceptanceCriteria = parseAcceptanceCriteria(sections.get("Acceptance criteria") ?? "");
   const blockedByRaw = sections.get("Blocked by") ?? null;
   const { dependencyPublicIds, manualBlockerFromMarkdown } = parseBlockedBySection(blockedByRaw);
+  const prdSection = sections.get("PRD") ?? null;
+  const userStoriesSection = sections.get("User stories") ?? sections.get("User Stories") ?? null;
 
   return {
     parent: parent?.trim() ? parent.trim() : null,
@@ -33,7 +45,64 @@ export function parseIssueMarkdown(bodyMarkdown: string): ParsedIssueMarkdown {
     blockedByRaw: blockedByRaw?.trim() ? blockedByRaw.trim() : null,
     dependencyPublicIds,
     manualBlockerFromMarkdown,
+    prdPublicIdFromMarkdown: parsePrdSection(prdSection),
+    userStoryNumbersFromMarkdown: parseUserStoryNumbersFromSection(userStoriesSection),
   };
+}
+
+function parsePrdSection(section: string | null): string | null {
+  if (!section?.trim()) {
+    return null;
+  }
+
+  const match = section.match(PRD_PUBLIC_ID_PATTERN);
+  return match?.[1] ?? null;
+}
+
+function parseUserStoryNumbersFromSection(section: string | null): number[] {
+  if (!section?.trim()) {
+    return [];
+  }
+
+  const seen = new Set<number>();
+  const numbers: number[] = [];
+
+  const addNumber = (value: number): void => {
+    if (!Number.isSafeInteger(value) || value <= 0 || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    numbers.push(value);
+  };
+
+  for (const line of section.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const numbered = trimmed.match(/^(?:[-*]\s*)?(\d+)[.)](?:\s+|$)/);
+    if (numbered) {
+      addNumber(Number(numbered[1]));
+      continue;
+    }
+
+    const bulletNumber = trimmed.match(/^[-*]\s+(\d+)\s*$/);
+    if (bulletNumber) {
+      addNumber(Number(bulletNumber[1]));
+      continue;
+    }
+
+    for (const token of trimmed.split(/[\s,]+/)) {
+      const cleaned = token.replace(/^[-*]\s*/, "").replace(/[.)]$/, "");
+      const number = Number(cleaned);
+      if (Number.isSafeInteger(number) && number > 0) {
+        addNumber(number);
+      }
+    }
+  }
+
+  return numbers;
 }
 
 function splitSections(markdown: string): Map<string, string> {

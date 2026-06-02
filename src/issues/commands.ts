@@ -1,7 +1,7 @@
 import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
 import { extractPrdUserStories } from "../prds/markdown.ts";
-import { findPrdById, findPrdByPublicId, getProjectKeyForPrd } from "../prds/repository.ts";
+import { findPrdById, getProjectKeyForPrd } from "../prds/repository.ts";
 import type { CommandResult } from "../projects/commands.ts";
 import { findProjectById, inferProjectFromCwd, listProjectPaths } from "../projects/repository.ts";
 import { generatePrompt } from "../prompts/generator.ts";
@@ -28,10 +28,12 @@ import {
   isValidComplexity,
   isValidTriageRole,
   isValidWorkflowStatus,
+  linkIssueToPrd,
   listBlockerIssues,
   listIssues,
   removeIssueDependency,
   resolveBodyInput,
+  unlinkIssueFromPrd,
   updateIssue,
 } from "./repository.ts";
 import type { Issue } from "./types.ts";
@@ -97,12 +99,18 @@ export function runIssueCreate(
     };
   }
 
-  const userStoryNumbers = parseUserStoryNumbers(input.userStories);
+  const bodyMarkdown = resolveBodyInput(input.body ?? "");
+  const parsed = parseIssueMarkdown(bodyMarkdown);
+  const selectedPrd = input.prd?.trim() || parsed.prdPublicIdFromMarkdown || undefined;
+
+  const userStoryNumbers = input.userStories?.trim()
+    ? parseUserStoryNumbers(input.userStories)
+    : { ok: true as const, numbers: parsed.userStoryNumbersFromMarkdown };
   if (!userStoryNumbers.ok) {
     return { ok: false, error: userStoryNumbers.error };
   }
 
-  if (userStoryNumbers.numbers.length > 0 && !input.prd?.trim()) {
+  if (userStoryNumbers.numbers.length > 0 && !selectedPrd) {
     return {
       ok: false,
       error: {
@@ -113,31 +121,23 @@ export function runIssueCreate(
   }
 
   const warnings: OutputWarning[] = [];
-  if (input.prd?.trim()) {
-    const prd = findPrdByPublicId(db, input.prd);
-    if (prd?.status === "archived") {
-      warnings.push({
-        code: "archived_prd",
-        message: `Linked PRD ${prd.publicId} is archived`,
-      });
-    }
-  }
 
   try {
     const issue = withTransaction(db, () =>
       createIssue(db, {
         projectKey: projectKey.key,
         title: input.title,
-        body: input.body,
+        body: bodyMarkdown,
         triageRole: input.triageRole as Issue["triageRole"] | undefined,
         workflowStatus: input.workflowStatus as Issue["workflowStatus"] | undefined,
         complexity: input.complexity as Issue["complexity"] | undefined,
         manualBlocker: input.manualBlocker,
         blockedByPublicIds: input.blockedBy ? [input.blockedBy.trim().toUpperCase()] : undefined,
-        prdPublicId: input.prd,
+        prdPublicId: selectedPrd,
         userStoryNumbers: userStoryNumbers.numbers,
       }),
     );
+    warnings.push(...collectLinkedPrdWarnings(db, issue));
     return { ok: true, data: withWarnings(issueToOutput(db, issue), warnings) };
   } catch (error) {
     return repositoryErrorToResult(error);
@@ -297,6 +297,77 @@ export function runIssueBlockBy(
 
   try {
     withTransaction(db, () => addIssueDependency(db, input.publicId, input.blockerPublicId));
+    const issue = findIssueByPublicId(db, input.publicId);
+    if (!issue) {
+      return {
+        ok: false,
+        error: {
+          code: "issue_not_found",
+          message: `Issue not found: ${input.publicId}`,
+        },
+      };
+    }
+    return { ok: true, data: issueDetailToOutput(db, issue) };
+  } catch (error) {
+    return repositoryErrorToResult(error);
+  }
+}
+
+export function runIssueLinkPrd(
+  db: Database,
+  input: { publicId: string; prd?: string; userStories?: string },
+): CommandResult {
+  if (!input.publicId.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing issue public ID" },
+    };
+  }
+
+  if (!input.prd?.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing required flag: --prd" },
+    };
+  }
+
+  const userStoryNumbers = parseUserStoryNumbers(input.userStories);
+  if (!userStoryNumbers.ok) {
+    return { ok: false, error: userStoryNumbers.error };
+  }
+
+  try {
+    withTransaction(db, () =>
+      linkIssueToPrd(db, input.publicId, input.prd!, userStoryNumbers.numbers),
+    );
+    const issue = findIssueByPublicId(db, input.publicId);
+    if (!issue) {
+      return {
+        ok: false,
+        error: {
+          code: "issue_not_found",
+          message: `Issue not found: ${input.publicId}`,
+        },
+      };
+    }
+
+    const warnings = collectLinkedPrdWarnings(db, issue);
+    return { ok: true, data: withWarnings(issueDetailToOutput(db, issue), warnings) };
+  } catch (error) {
+    return repositoryErrorToResult(error);
+  }
+}
+
+export function runIssueUnlinkPrd(db: Database, input: { publicId: string }): CommandResult {
+  if (!input.publicId.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing issue public ID" },
+    };
+  }
+
+  try {
+    withTransaction(db, () => unlinkIssueFromPrd(db, input.publicId));
     const issue = findIssueByPublicId(db, input.publicId);
     if (!issue) {
       return {
@@ -751,6 +822,48 @@ function withWarnings(
     ...output,
     warnings,
   };
+}
+
+function archivedPrdWarning(publicId: string): OutputWarning {
+  return {
+    code: "archived_prd",
+    message: `Linked PRD ${publicId} is archived`,
+  };
+}
+
+function missingUserStoriesWarning(
+  prdPublicId: string,
+  missingNumbers: number[],
+): OutputWarning | null {
+  if (missingNumbers.length === 0) {
+    return null;
+  }
+  return {
+    code: "missing_user_stories",
+    message: `PRD ${prdPublicId} is missing user story reference(s): ${missingNumbers.join(", ")}`,
+  };
+}
+
+function collectLinkedPrdWarnings(db: Database, issue: Issue): OutputWarning[] {
+  const linked = linkedPrdToOutput(db, issue);
+  if (!linked) {
+    return [];
+  }
+
+  const warnings: OutputWarning[] = [];
+  if (linked.status === "archived") {
+    warnings.push(archivedPrdWarning(String(linked.publicId)));
+  }
+
+  const missingWarning = missingUserStoriesWarning(
+    String(linked.publicId),
+    linked.missingUserStoryNumbers as number[],
+  );
+  if (missingWarning) {
+    warnings.push(missingWarning);
+  }
+
+  return warnings;
 }
 
 function parseUserStoryNumbers(

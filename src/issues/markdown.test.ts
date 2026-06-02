@@ -77,4 +77,61 @@ OLA-2
     parseIssueMarkdown(body);
     expect(body).toBe(FULL_BODY);
   });
+
+  test("parses PRD section to prdPublicIdFromMarkdown", () => {
+    const parsed = parseIssueMarkdown(`## PRD
+
+APP-PRD-1
+`);
+    expect(parsed.prdPublicIdFromMarkdown).toBe("APP-PRD-1");
+  });
+
+  test("does not treat Parent section content as PRD", () => {
+    const parsed = parseIssueMarkdown(`## Parent
+
+APP-10
+
+## PRD
+
+APP-PRD-2
+`);
+    expect(parsed.parent).toBe("APP-10");
+    expect(parsed.prdPublicIdFromMarkdown).toBe("APP-PRD-2");
+  });
+
+  test("parses User Stories section to userStoryNumbersFromMarkdown", () => {
+    const parsed = parseIssueMarkdown(`## User Stories
+
+1, 3
+2
+`);
+    expect(parsed.userStoryNumbersFromMarkdown).toEqual([1, 3, 2]);
+  });
+
+  test("parses comma-separated and bullet user story refs", () => {
+    const parsed = parseIssueMarkdown(`## User stories
+
+1, 4
+- 2
+- 3
+`);
+    expect(parsed.userStoryNumbersFromMarkdown).toEqual([1, 4, 2, 3]);
+  });
+
+  test("parses numbered user story lines", () => {
+    const parsed = parseIssueMarkdown(`## User Stories
+
+1. As a user, I want checkout.
+2. As a user, I want payment.
+`);
+    expect(parsed.userStoryNumbersFromMarkdown).toEqual([1, 2]);
+  });
+
+  test("ignores invalid user story tokens in markdown", () => {
+    const parsed = parseIssueMarkdown(`## User stories
+
+see story one, 2, pending
+`);
+    expect(parsed.userStoryNumbersFromMarkdown).toEqual([2]);
+  });
 });

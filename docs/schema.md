@@ -218,7 +218,10 @@ Commands that emit PRD or issue data include structured PRD fields so agents do 
     "status": "active",
     "userStoryNumbers": [3, 7],
     "userStories": [
-      { "number": 3, "text": "As a shopper, I want card errors before submit, so that I can correct them quickly." },
+      {
+        "number": 3,
+        "text": "As a shopper, I want card errors before submit, so that I can correct them quickly."
+      },
       { "number": 7, "text": null }
     ],
     "missingUserStoryNumbers": [7]
