@@ -32,6 +32,10 @@ describe("skill commands", () => {
     expect(content).toContain("deck issue next --mode plan|implement|review|address-review");
     expect(content).toContain("to-prd");
     expect(content).toContain("to-issues");
+    expect(content).toContain("deck prd create --project <KEY>");
+    expect(content).toContain("--prd <PRD_ID> --user-stories 1,3");
+    expect(content).toContain("PRD link: product context and user story traceability");
+    expect(content).not.toContain("create one parent issue");
     expect(content).toContain("GitHub/Gitea/Jira/Linear/Obsidian");
   });
 
@@ -103,6 +107,10 @@ describe("skill commands", () => {
     expect(result.data.text).toContain("## Flightdeck issue tracking");
     expect(result.data.text).toContain("invoke the `flightdeck` skill");
     expect(result.data.text).toContain("If another skill names another issue tracker");
+    expect(result.data.text).toContain("Map `to-prd` to `deck prd create`");
+    expect(result.data.text).toContain(
+      "PRD-linked `deck issue create --prd <PRD_ID> --user-stories <NUMBERS>`",
+    );
     expect(result.data.text).not.toContain(
       "deck issue next --mode plan|implement|review|address-review",
     );

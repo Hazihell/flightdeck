@@ -141,6 +141,7 @@ Tests use isolated temporary `FLIGHTDECK_HOME` directories.
 - [Agent workflows](./docs/agent-workflows.md) — How humans and agents plan, implement, review, and address feedback
 - [Skill adapter](./docs/skill-adapter.md) — Contract for skills that publish issues through `deck`
 - [Schema](./docs/schema.md) — Data model, queue rules, relationships, and enums
+- [ADR 0001](./docs/adr/0001-first-class-prds.md) — Why PRDs are first-class records, not parent issues, blockers, or issue plans
 - [CONTEXT.md](./CONTEXT.md) — Domain language
 
 ## Roadmap
