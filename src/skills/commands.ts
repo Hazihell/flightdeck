@@ -19,9 +19,25 @@ description: Use Flightdeck (deck) for issue-tracker work in registered repos, i
 
 Flightdeck is the issue tracker. If another skill says "publish to the issue tracker" or names GitHub/Gitea/Jira/Linear/Obsidian/etc., translate that workflow to \`deck\`. Do not store issue state in repo files or external trackers unless the user explicitly overrides.
 
-## Publish work
+## Publish PRDs and slices
 
-Use for PRDs, parent specs, and vertical slices from skills like \`to-prd\` and \`to-issues\`. Run from a registered repo, or pass \`--project <KEY>\`. Use \`--json\` when consuming output.
+Use for PRDs and vertical slices from skills like \`to-prd\` and \`to-issues\`. Run from a registered repo, or pass \`--project <KEY>\`. Use \`--json\` when consuming output.
+
+- \`to-prd\`: save the generated PRD as a first-class PRD record, not as an issue.
+- \`to-issues\`: read an existing PRD or import a markdown PRD file first, then create linked vertical-slice issues with \`--prd <PRD_ID>\` and \`--user-stories <NUMBERS>\`.
+- Dependencies still use \`--blocked-by <ISSUE_ID>\`; publish blockers before dependent slices.
+
+\`\`\`bash
+deck prd create --project <KEY> --title "<TITLE>" --body <MD_OR_PATH> --json
+deck issue create --project <KEY> --title "<TITLE>" --body <MD_OR_PATH> --prd <PRD_ID> --user-stories 1,3 --triage-role ready-for-agent --complexity simple|needs-plan --json
+\`\`\`
+
+\`Parent\`, \`Blocked by\`, PRDs, and Issue Plans are different relationships:
+
+- \`Parent\`: issue hierarchy or source grouping only.
+- \`Blocked by\`: dependency ordering between issues.
+- PRD link: product context and user story traceability for one issue.
+- Issue Plan: implementation guidance attached to one issue after planning.
 
 Body shape:
 
@@ -36,8 +52,7 @@ None or <PUBLIC_ID>
 None - can start immediately
 \`\`\`
 
-- PRD/spec: create one parent issue; put the concise PRD in \`What to build\`; use \`--complexity needs-plan\` for non-simple implementation.
-- Slices: create one issue per approved vertical slice, blockers first; pass \`--blocked-by <PUBLIC_ID>\` for dependencies; usually set \`--triage-role ready-for-agent\`.
+- Slices: create one issue per approved vertical slice, blockers first; usually set \`--triage-role ready-for-agent\`.
 
 \`\`\`bash
 deck issue create --project <KEY> --title "<TITLE>" --body <MD_OR_PATH> --triage-role ready-for-agent --complexity simple|needs-plan --json
@@ -70,6 +85,7 @@ In Flightdeck-registered repos, all issue work must use Flightdeck.
 
 - For creating, planning, selecting, implementing, reviewing, addressing feedback, or updating issues, invoke the \`flightdeck\` skill and follow it for exact \`deck\` commands.
 - If another skill names another issue tracker, map that workflow to Flightdeck instead unless the user explicitly overrides this.
+- Map \`to-prd\` to \`deck prd create\`; map \`to-issues\` to PRD-linked \`deck issue create --prd <PRD_ID> --user-stories <NUMBERS>\` calls.
 - Do not write issue state to the repo or external trackers.
 - Require an approved Flightdeck plan before non-simple implementation.
 `;

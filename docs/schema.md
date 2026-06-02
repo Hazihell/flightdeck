@@ -4,6 +4,17 @@ SQLite database at `$FLIGHTDECK_HOME/flightdeck.sqlite` (default `~/Flightdeck/f
 
 Current schema version: **5**.
 
+## Core Concepts
+
+PRDs are first-class, project-scoped records. They provide product context and user story traceability for issues, but they are not issues and do not move through issue queues.
+
+Issue relationships have separate meanings:
+
+- `Parent` in issue markdown is hierarchy or source grouping metadata.
+- `issue_dependencies` represents `Blocked by` execution ordering between issues.
+- `issue_prd_links` links one issue to one same-project PRD and optional numbered user stories.
+- `issue_document_links` with `link_kind=plan` attaches an implementation plan to one issue.
+
 ## Tables
 
 ### `schema_migrations`
@@ -93,6 +104,8 @@ Unique: `(project_id, sequence)`.
 
 Unique: `(project_id, sequence)`.
 
+PRD public IDs use the project key plus a PRD sequence, for example `OLA-PRD-1`. PRDs are stored in SQLite as application records, not as issue markdown or repository files. Normal listing returns draft and active PRDs by default; archived PRDs remain readable when requested explicitly.
+
 ### `issue_dependencies`
 
 | Column             | Type                  | Notes           |
@@ -118,6 +131,8 @@ Unique: `(issue_id, blocker_issue_id)`.
 | `updated_at`      | TEXT                  |                                             |
 
 Unique: `(issue_id)` — an issue can link to at most one PRD. Parent issues, blockers, and issue plan documents remain separate relationships.
+
+`user_story_refs` stores the requested numbered user story references as JSON, for example `[3,7]`. Flightdeck preserves the requested numbers even when a later PRD edit removes or renumbers a story; command output surfaces missing references instead of rewriting the link.
 
 ### `issue_comments`
 
@@ -164,6 +179,54 @@ issues 1──0..1 prds  (via issue_prd_links)
 issues 1──* issue_comments
 issues 1──0..1 documents  (via issue_document_links, link_kind=plan)
 ```
+
+## JSON Output
+
+Commands that emit PRD or issue data include structured PRD fields so agents do not need to reparse markdown for traceability.
+
+`deck prd show <PUBLIC_ID> --json` and PRD entries in `deck prd list --json` include:
+
+```json
+{
+  "kind": "prd",
+  "publicId": "OLA-PRD-1",
+  "projectKey": "OLA",
+  "title": "Checkout flow",
+  "status": "active",
+  "bodyMarkdown": "# PRD\n\n...",
+  "userStories": [
+    {
+      "number": 3,
+      "text": "As a shopper, I want card errors before submit, so that I can correct them quickly."
+    }
+  ]
+}
+```
+
+`userStories` is extracted from numbered items under the PRD's `User Stories` section when present. Missing or malformed sections produce an empty array; the PRD body remains canonical.
+
+`deck issue create --json`, `deck issue show --json`, queue results, and issue lists include `linkedPrd`:
+
+```json
+{
+  "kind": "issue",
+  "publicId": "OLA-12",
+  "linkedPrd": {
+    "publicId": "OLA-PRD-1",
+    "projectKey": "OLA",
+    "title": "Checkout flow",
+    "status": "active",
+    "userStoryNumbers": [3, 7],
+    "userStories": [
+      { "number": 3, "text": "As a shopper, I want card errors before submit, so that I can correct them quickly." },
+      { "number": 7, "text": null }
+    ],
+    "missingUserStoryNumbers": [7]
+  }
+}
+```
+
+`linkedPrd` is `null` when the issue is not PRD-backed. `userStoryNumbers` is the stored reference list. `userStories[].text` is `null` for requested stories that are not currently found in the PRD body, and those numbers also appear in `missingUserStoryNumbers`.
 
 ## Enums
 
