@@ -1002,4 +1002,206 @@ None - can start immediately
       expect(response.data.linkedPrd.userStoryNumbers).toEqual([1]);
     }
   });
+
+  test("links corrects and unlinks an existing issue PRD without rewriting the body", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "LNK", name: "Links" });
+      createIssue(db, {
+        projectKey: "LNK",
+        title: "Existing slice",
+        body: "## What to build\n\nPreserve this body exactly.",
+      });
+      createPrd(db, {
+        projectKey: "LNK",
+        title: "First PRD",
+        body: "# First\n\n## User Stories\n\n1. As a user, I want first context.",
+      });
+      createPrd(db, {
+        projectKey: "LNK",
+        title: "Second PRD",
+        body: "# Second\n\n## User Stories\n\n2. As a user, I want corrected context.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const linked = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: {
+        publicId: string;
+        userStoryNumbers: number[];
+        missingUserStoryNumbers: number[];
+      };
+      warnings: Array<{ code: string; message: string }>;
+    }>(["issue", "link-prd", "LNK-1", "--prd", "LNK-PRD-1", "--user-stories", "1,99"], env);
+
+    expect(linked.exitCode).toBe(0);
+    expect(linked.response.ok).toBe(true);
+    if (linked.response.ok) {
+      expect(linked.response.data.bodyMarkdown).toBe(
+        "## What to build\n\nPreserve this body exactly.",
+      );
+      expect(linked.response.data.linkedPrd.publicId).toBe("LNK-PRD-1");
+      expect(linked.response.data.linkedPrd.userStoryNumbers).toEqual([1, 99]);
+      expect(linked.response.data.linkedPrd.missingUserStoryNumbers).toEqual([99]);
+      expect(linked.response.data.warnings).toEqual([
+        {
+          code: "missing_user_stories",
+          message: "User story references not found in PRD LNK-PRD-1: 99",
+        },
+      ]);
+    }
+
+    const corrected = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(["issue", "link-prd", "LNK-1", "--prd", "LNK-PRD-2", "--user-stories", "2"], env);
+
+    expect(corrected.exitCode).toBe(0);
+    expect(corrected.response.ok).toBe(true);
+    if (corrected.response.ok) {
+      expect(corrected.response.data.bodyMarkdown).toBe(
+        "## What to build\n\nPreserve this body exactly.",
+      );
+      expect(corrected.response.data.linkedPrd.publicId).toBe("LNK-PRD-2");
+      expect(corrected.response.data.linkedPrd.userStoryNumbers).toEqual([2]);
+    }
+
+    const unlinked = spawnDeckJson<{ bodyMarkdown: string; linkedPrd: null }>(
+      ["issue", "unlink-prd", "LNK-1"],
+      env,
+    );
+    expect(unlinked.exitCode).toBe(0);
+    expect(unlinked.response.ok).toBe(true);
+    if (unlinked.response.ok) {
+      expect(unlinked.response.data.linkedPrd).toBeNull();
+      expect(unlinked.response.data.bodyMarkdown).toBe(
+        "## What to build\n\nPreserve this body exactly.",
+      );
+    }
+  });
+
+  test("parses PRD markdown sections and lets explicit flags take precedence", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "MDS", name: "Markdown sections" });
+      createPrd(db, {
+        projectKey: "MDS",
+        title: "Markdown PRD",
+        body: "# Markdown\n\n## User Stories\n\n1. As a user, I want markdown context.\n2. As a user, I want more context.",
+      });
+      createPrd(db, {
+        projectKey: "MDS",
+        title: "Flag PRD",
+        body: "# Flags\n\n## User Stories\n\n3. As a user, I want flag context.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `## PRD
+
+MDS-PRD-1
+
+## User stories
+
+1-2
+
+## What to build
+
+Build from markdown sections.`;
+
+    const fromMarkdown = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(["issue", "create", "--project", "MDS", "--title", "Markdown slice", "--body", body], env);
+
+    expect(fromMarkdown.exitCode).toBe(0);
+    expect(fromMarkdown.response.ok).toBe(true);
+    if (fromMarkdown.response.ok) {
+      expect(fromMarkdown.response.data.bodyMarkdown).toBe(body);
+      expect(fromMarkdown.response.data.linkedPrd.publicId).toBe("MDS-PRD-1");
+      expect(fromMarkdown.response.data.linkedPrd.userStoryNumbers).toEqual([1, 2]);
+    }
+
+    const fromFlags = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "MDS",
+        "--title",
+        "Flag slice",
+        "--body",
+        body,
+        "--prd",
+        "MDS-PRD-2",
+        "--user-stories",
+        "3",
+      ],
+      env,
+    );
+
+    expect(fromFlags.exitCode).toBe(0);
+    expect(fromFlags.response.ok).toBe(true);
+    if (fromFlags.response.ok) {
+      expect(fromFlags.response.data.bodyMarkdown).toBe(body);
+      expect(fromFlags.response.data.linkedPrd.publicId).toBe("MDS-PRD-2");
+      expect(fromFlags.response.data.linkedPrd.userStoryNumbers).toEqual([3]);
+    }
+  });
+
+  test("update body can backfill PRD links from markdown sections", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "BFL", name: "Backfill" });
+      createIssue(db, {
+        projectKey: "BFL",
+        title: "Needs PRD",
+        body: "## What to build\n\nOriginal body",
+      });
+      createPrd(db, {
+        projectKey: "BFL",
+        title: "Backfill PRD",
+        body: "# Backfill\n\n## User Stories\n\n4. As a user, I want backfilled context.",
+      });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `## PRD
+
+BFL-PRD-1
+
+## User stories
+
+4
+
+## What to build
+
+Updated body`;
+
+    const updated = spawnDeckJson<{
+      bodyMarkdown: string;
+      linkedPrd: { publicId: string; userStoryNumbers: number[] };
+    }>(["issue", "update", "BFL-1", "--body", body], env);
+
+    expect(updated.exitCode).toBe(0);
+    expect(updated.response.ok).toBe(true);
+    if (updated.response.ok) {
+      expect(updated.response.data.bodyMarkdown).toBe(body);
+      expect(updated.response.data.linkedPrd.publicId).toBe("BFL-PRD-1");
+      expect(updated.response.data.linkedPrd.userStoryNumbers).toEqual([4]);
+    }
+  });
 });

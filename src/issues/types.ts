@@ -84,6 +84,8 @@ export type IssuePrdLink = {
 
 export type ParsedIssueMarkdown = {
   parent: string | null;
+  prdPublicId: string | null;
+  userStoryNumbers: number[];
   whatToBuild: string | null;
   acceptanceCriteria: string[];
   blockedByRaw: string | null;
