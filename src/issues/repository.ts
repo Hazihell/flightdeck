@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Database } from "../db/client.ts";
 import { resolveMarkdownBodyInput } from "../markdown-body.ts";
+import { findPrdByPublicId } from "../prds/repository.ts";
 import { findProjectById, findProjectByKey } from "../projects/repository.ts";
 import { nowIso } from "../time.ts";
 import { DEFAULT_ISSUE_BODY, parseIssueMarkdown } from "./markdown.ts";
@@ -14,6 +15,7 @@ import {
   DEFAULT_WORKFLOW_STATUS,
   type Issue,
   type IssueDependency,
+  type IssuePrdLink,
   PLAN_STATUSES,
   type PlanStatus,
   TRIAGE_ROLES,
@@ -49,6 +51,15 @@ type DependencyRow = {
   issue_id: string;
   blocker_issue_id: string;
   created_at: string;
+};
+
+type IssuePrdLinkRow = {
+  id: string;
+  issue_id: string;
+  prd_id: string;
+  user_story_refs: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type IssueListFilters = {
@@ -88,6 +99,48 @@ function mapDependency(row: DependencyRow): IssueDependency {
     blockerIssueId: row.blocker_issue_id,
     createdAt: row.created_at,
   };
+}
+
+function mapIssuePrdLink(row: IssuePrdLinkRow): IssuePrdLink {
+  return {
+    id: row.id,
+    issueId: row.issue_id,
+    prdId: row.prd_id,
+    userStoryNumbers: parseStoredUserStoryRefs(row.user_story_refs),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function parseStoredUserStoryRefs(value: string): number[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return normalizeUserStoryNumbers(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeUserStoryNumbers(values: unknown[]): number[] {
+  const seen = new Set<number>();
+  const normalized: number[] = [];
+  for (const value of values) {
+    const number =
+      typeof value === "number"
+        ? value
+        : typeof value === "string"
+          ? Number(value.trim())
+          : Number.NaN;
+    if (!Number.isSafeInteger(number) || number <= 0 || seen.has(number)) {
+      continue;
+    }
+    seen.add(number);
+    normalized.push(number);
+  }
+  return normalized;
 }
 
 export function resolveBodyInput(body: string): string {
@@ -132,6 +185,8 @@ export function createIssue(
     planStatus?: PlanStatus;
     manualBlocker?: string;
     blockedByPublicIds?: string[];
+    prdPublicId?: string;
+    userStoryNumbers?: number[];
   },
 ): Issue {
   const project = findProjectByKey(db, input.projectKey);
@@ -214,6 +269,10 @@ export function createIssue(
         // Ignore unresolved markdown references at creation time.
       }
     }
+  }
+
+  if (input.prdPublicId?.trim()) {
+    linkIssueToPrd(db, issue.publicId, input.prdPublicId, input.userStoryNumbers ?? []);
   }
 
   return findIssueByPublicId(db, issue.publicId) ?? issue;
@@ -381,6 +440,62 @@ export function listBlockerIssues(db: Database, issueId: string): Issue[] {
   return blockers;
 }
 
+export function linkIssueToPrd(
+  db: Database,
+  issuePublicId: string,
+  prdPublicId: string,
+  userStoryNumbers: number[],
+): IssuePrdLink {
+  const issue = findIssueByPublicId(db, issuePublicId);
+  if (!issue) {
+    throw new IssueRepositoryError("issue_not_found", `Issue not found: ${issuePublicId}`);
+  }
+
+  const prd = findPrdByPublicId(db, prdPublicId);
+  if (!prd) {
+    throw new IssueRepositoryError("prd_not_found", `PRD not found: ${prdPublicId}`);
+  }
+
+  if (issue.projectId !== prd.projectId) {
+    throw new IssueRepositoryError(
+      "prd_project_mismatch",
+      `PRD ${prd.publicId} belongs to a different project than issue ${issue.publicId}`,
+    );
+  }
+
+  const timestamp = nowIso();
+  const link: IssuePrdLink = {
+    id: randomUUID(),
+    issueId: issue.id,
+    prdId: prd.id,
+    userStoryNumbers: normalizeUserStoryNumbers(userStoryNumbers),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  db.query(
+    `INSERT INTO issue_prd_links (
+      id, issue_id, prd_id, user_story_refs, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    link.id,
+    link.issueId,
+    link.prdId,
+    JSON.stringify(link.userStoryNumbers),
+    link.createdAt,
+    link.updatedAt,
+  );
+
+  return link;
+}
+
+export function findIssuePrdLinkByIssueId(db: Database, issueId: string): IssuePrdLink | null {
+  const row = db
+    .query<IssuePrdLinkRow, [string]>("SELECT * FROM issue_prd_links WHERE issue_id = ?")
+    .get(issueId);
+  return row ? mapIssuePrdLink(row) : null;
+}
+
 export function listAllIssues(db: Database): Issue[] {
   const rows = db
     .query<IssueRow, []>("SELECT * FROM issues ORDER BY project_id ASC, sequence ASC")
@@ -485,6 +600,8 @@ export type IssueRepositoryErrorCode =
   | "project_not_found"
   | "issue_not_found"
   | "blocker_not_found"
+  | "prd_not_found"
+  | "prd_project_mismatch"
   | "invalid_dependency"
   | "duplicate_dependency";
 

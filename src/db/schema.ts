@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   {
@@ -119,6 +119,20 @@ export const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         UNIQUE (project_id, sequence)
+      );
+    `,
+  },
+  {
+    version: 5,
+    sql: `
+      CREATE TABLE IF NOT EXISTS issue_prd_links (
+        id TEXT PRIMARY KEY NOT NULL,
+        issue_id TEXT NOT NULL REFERENCES issues(id),
+        prd_id TEXT NOT NULL REFERENCES prds(id),
+        user_story_refs TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (issue_id)
       );
     `,
   },

@@ -34,7 +34,7 @@ Usage:
   deck prd list [--project <KEY>] [--status draft|active|archived]
   deck prd show <PUBLIC_ID>
   deck prd update <PUBLIC_ID> [--title <TITLE>] [--body <MARKDOWN_OR_PATH>] [--status draft|active|archived]
-  deck issue create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--triage-role <ROLE>] [--workflow-status <STATUS>] [--complexity simple|needs-plan] [--blocked-by <PUBLIC_ID>] [--manual-blocker <TEXT>]
+  deck issue create --project <KEY> --title <TITLE> --body <MARKDOWN_OR_PATH> [--triage-role <ROLE>] [--workflow-status <STATUS>] [--complexity simple|needs-plan] [--blocked-by <PUBLIC_ID>] [--manual-blocker <TEXT>] [--prd <PRD_PUBLIC_ID>] [--user-stories <NUMBERS>]
   deck issue list [--project <KEY>] [--status <STATUS>] [--triage-role <ROLE>]
   deck issue show <PUBLIC_ID>
   deck issue update <PUBLIC_ID> [--title <TITLE>] [--body <MARKDOWN_OR_PATH>] [--triage-role <ROLE>] [--complexity simple|needs-plan] [--manual-blocker <TEXT>] [--clear-manual-blocker]
@@ -156,11 +156,25 @@ function printHumanData(data: Record<string, unknown>): void {
   }
 }
 
+function printWarnings(data: Record<string, unknown> | undefined): void {
+  const warnings = data?.warnings as Array<Record<string, unknown>> | undefined;
+  if (!warnings || warnings.length === 0) {
+    return;
+  }
+  for (const warning of warnings) {
+    console.error(`warning: ${String(warning.message)}`);
+  }
+}
+
 function shouldEmitJson(flags: Map<string, string | boolean>): boolean {
   return hasFlag(flags, "json") || !process.stdout.isTTY;
 }
 
 function printOutput(output: CliOutput, flags: Map<string, string | boolean>): void {
+  if (output.ok) {
+    printWarnings(output.data);
+  }
+
   if (shouldEmitJson(flags)) {
     console.log(JSON.stringify(output));
     return;
@@ -338,6 +352,8 @@ export async function runCli(
           complexity: flagString(flags, "complexity"),
           blockedBy: flagString(flags, "blocked-by"),
           manualBlocker: flagString(flags, "manual-blocker"),
+          prd: flagString(flags, "prd"),
+          userStories: flagString(flags, "user-stories") ?? flagString(flags, "user-story"),
         });
         const output: CliOutput = result.ok
           ? { ok: true, command: "issue create", data: result.data }

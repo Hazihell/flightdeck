@@ -1,5 +1,7 @@
 import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
+import { extractPrdUserStories } from "../prds/markdown.ts";
+import { findPrdById, findPrdByPublicId, getProjectKeyForPrd } from "../prds/repository.ts";
 import type { CommandResult } from "../projects/commands.ts";
 import { findProjectById, inferProjectFromCwd, listProjectPaths } from "../projects/repository.ts";
 import { generatePrompt } from "../prompts/generator.ts";
@@ -20,6 +22,7 @@ import {
   addMissingDependenciesFromMarkdown,
   createIssue,
   findIssueByPublicId,
+  findIssuePrdLinkByIssueId,
   getProjectKeyForIssue,
   IssueRepositoryError,
   isValidComplexity,
@@ -48,6 +51,8 @@ export function runIssueCreate(
     complexity?: string;
     blockedBy?: string;
     manualBlocker?: string;
+    prd?: string;
+    userStories?: string;
   },
 ): CommandResult {
   if (!input.title.trim()) {
@@ -92,6 +97,32 @@ export function runIssueCreate(
     };
   }
 
+  const userStoryNumbers = parseUserStoryNumbers(input.userStories);
+  if (!userStoryNumbers.ok) {
+    return { ok: false, error: userStoryNumbers.error };
+  }
+
+  if (userStoryNumbers.numbers.length > 0 && !input.prd?.trim()) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: "--user-stories requires --prd",
+      },
+    };
+  }
+
+  const warnings: OutputWarning[] = [];
+  if (input.prd?.trim()) {
+    const prd = findPrdByPublicId(db, input.prd);
+    if (prd?.status === "archived") {
+      warnings.push({
+        code: "archived_prd",
+        message: `Linked PRD ${prd.publicId} is archived`,
+      });
+    }
+  }
+
   try {
     const issue = withTransaction(db, () =>
       createIssue(db, {
@@ -103,9 +134,11 @@ export function runIssueCreate(
         complexity: input.complexity as Issue["complexity"] | undefined,
         manualBlocker: input.manualBlocker,
         blockedByPublicIds: input.blockedBy ? [input.blockedBy.trim().toUpperCase()] : undefined,
+        prdPublicId: input.prd,
+        userStoryNumbers: userStoryNumbers.numbers,
       }),
     );
-    return { ok: true, data: issueToOutput(db, issue) };
+    return { ok: true, data: withWarnings(issueToOutput(db, issue), warnings) };
   } catch (error) {
     return repositoryErrorToResult(error);
   }
@@ -702,6 +735,58 @@ function isValidQueueMode(value: string): value is QueueMode {
   return (QUEUE_MODES as readonly string[]).includes(value);
 }
 
+type OutputWarning = {
+  code: string;
+  message: string;
+};
+
+function withWarnings(
+  output: Record<string, unknown>,
+  warnings: OutputWarning[],
+): Record<string, unknown> {
+  if (warnings.length === 0) {
+    return output;
+  }
+  return {
+    ...output,
+    warnings,
+  };
+}
+
+function parseUserStoryNumbers(
+  input: string | undefined,
+): { ok: true; numbers: number[] } | { ok: false; error: { code: string; message: string } } {
+  if (!input?.trim()) {
+    return { ok: true, numbers: [] };
+  }
+
+  const values = input
+    .split(/[\s,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const seen = new Set<number>();
+  const numbers: number[] = [];
+
+  for (const value of values) {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number <= 0) {
+      return {
+        ok: false,
+        error: {
+          code: "invalid_input",
+          message: `Invalid user story reference: ${value}`,
+        },
+      };
+    }
+    if (!seen.has(number)) {
+      seen.add(number);
+      numbers.push(number);
+    }
+  }
+
+  return { ok: true, numbers };
+}
+
 function issueToOutput(db: Database, issue: Issue): Record<string, unknown> {
   return {
     ...issueSummaryToOutput(db, issue),
@@ -724,8 +809,41 @@ function issueSummaryToOutput(db: Database, issue: Issue): Record<string, unknow
     planStatus: issue.planStatus,
     manualBlocker: issue.manualBlocker,
     unblocked: isIssueUnblocked(db, issue),
+    linkedPrd: linkedPrdToOutput(db, issue),
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
+  };
+}
+
+function linkedPrdToOutput(db: Database, issue: Issue): Record<string, unknown> | null {
+  const link = findIssuePrdLinkByIssueId(db, issue.id);
+  if (!link) {
+    return null;
+  }
+
+  const prd = findPrdById(db, link.prdId);
+  if (!prd) {
+    return null;
+  }
+
+  const storiesByNumber = new Map(
+    extractPrdUserStories(prd.bodyMarkdown).map((story) => [story.number, story.text]),
+  );
+  const userStories = link.userStoryNumbers.map((number) => ({
+    number,
+    text: storiesByNumber.get(number) ?? null,
+  }));
+
+  return {
+    id: prd.id,
+    publicId: prd.publicId,
+    projectId: prd.projectId,
+    projectKey: getProjectKeyForPrd(db, prd),
+    title: prd.title,
+    status: prd.status,
+    userStoryNumbers: link.userStoryNumbers,
+    userStories,
+    missingUserStoryNumbers: link.userStoryNumbers.filter((number) => !storiesByNumber.has(number)),
   };
 }
 
