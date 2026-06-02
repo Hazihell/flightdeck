@@ -11,6 +11,7 @@ import {
   runIssueBlockBy,
   runIssueComment,
   runIssueCreate,
+  runIssueLinkPrd,
   runIssueList,
   runIssueMove,
   runIssueNext,
@@ -18,6 +19,7 @@ import {
   runIssueRequestPlanChanges,
   runIssueShow,
   runIssueUnblockBy,
+  runIssueUnlinkPrd,
   runIssueUpdate,
 } from "./issues/commands.ts";
 import { runPrdCreate, runPrdList, runPrdShow, runPrdUpdate } from "./prds/commands.ts";
@@ -38,9 +40,12 @@ Usage:
   deck issue list [--project <KEY>] [--status <STATUS>] [--triage-role <ROLE>]
   deck issue show <PUBLIC_ID>
   deck issue update <PUBLIC_ID> [--title <TITLE>] [--body <MARKDOWN_OR_PATH>] [--triage-role <ROLE>] [--complexity simple|needs-plan] [--manual-blocker <TEXT>] [--clear-manual-blocker]
-    (--body adds structured dependencies from ## Blocked by; use unblock-by to remove them)
+    [--prd <PRD_PUBLIC_ID>] [--user-stories <NUMBERS>] [--clear-prd]
+    (--body adds structured dependencies from ## Blocked by and can link PRDs from ## PRD; use unblock-by/unlink-prd to remove structured links)
   deck issue block-by <PUBLIC_ID> --issue <BLOCKER_PUBLIC_ID>
   deck issue unblock-by <PUBLIC_ID> --issue <BLOCKER_PUBLIC_ID>
+  deck issue link-prd <PUBLIC_ID> --prd <PRD_PUBLIC_ID> [--user-stories <NUMBERS>]
+  deck issue unlink-prd <PUBLIC_ID>
   deck issue next --mode plan|implement|review|address-review [--project <KEY>]
   deck issue move <PUBLIC_ID> --status <STATUS> [--validation <TEXT>] [--branch <BRANCH>] [--worktree-path <PATH>] [--commit <REF>] [--pr-url <URL>]
   deck issue comment <PUBLIC_ID> --body <TEXT_OR_PATH>
@@ -412,6 +417,9 @@ export async function runCli(
           complexity: flagString(flags, "complexity"),
           manualBlocker: flagString(flags, "manual-blocker"),
           clearManualBlocker: hasFlag(flags, "clear-manual-blocker"),
+          prd: flagString(flags, "prd"),
+          userStories: flagString(flags, "user-stories") ?? flagString(flags, "user-story"),
+          clearPrd: hasFlag(flags, "clear-prd"),
         });
         const output: CliOutput = result.ok
           ? { ok: true, command: "issue update", data: result.data }
@@ -454,6 +462,42 @@ export async function runCli(
         const output: CliOutput = result.ok
           ? { ok: true, command: "issue unblock-by", data: result.data }
           : { ok: false, command: "issue unblock-by", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
+    if (root === "issue" && sub === "link-prd" && parsed.command.length >= 2) {
+      const publicId =
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runIssueLinkPrd(db, {
+          publicId,
+          prd: flagString(flags, "prd") ?? "",
+          userStories: flagString(flags, "user-stories") ?? flagString(flags, "user-story"),
+        });
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "issue link-prd", data: result.data }
+          : { ok: false, command: "issue link-prd", error: result.error };
+        printOutput(output, flags);
+        return result.ok ? 0 : 1;
+      } finally {
+        closeDatabase(db);
+      }
+    }
+
+    if (root === "issue" && sub === "unlink-prd" && parsed.command.length >= 2) {
+      const publicId =
+        parsed.command.length >= 3 ? (parsed.command[2] ?? "") : (parsed.positional[0] ?? "");
+      const db = openDatabase(resolveFlightdeckHome(env, platformHome));
+      try {
+        const result = runIssueUnlinkPrd(db, publicId);
+        const output: CliOutput = result.ok
+          ? { ok: true, command: "issue unlink-prd", data: result.data }
+          : { ok: false, command: "issue unlink-prd", error: result.error };
         printOutput(output, flags);
         return result.ok ? 0 : 1;
       } finally {

@@ -28,10 +28,12 @@ import {
   isValidComplexity,
   isValidTriageRole,
   isValidWorkflowStatus,
+  linkIssueToPrd,
   listBlockerIssues,
   listIssues,
   removeIssueDependency,
   resolveBodyInput,
+  unlinkIssueFromPrd,
   updateIssue,
 } from "./repository.ts";
 import type { Issue } from "./types.ts";
@@ -97,44 +99,40 @@ export function runIssueCreate(
     };
   }
 
-  const userStoryNumbers = parseUserStoryNumbers(input.userStories);
+  const bodyMarkdown = resolveBodyInput(input.body ?? "");
+  const parsed = parseIssueMarkdown(bodyMarkdown);
+  const prdPublicId = input.prd?.trim() || parsed.prdPublicId || undefined;
+  const userStoriesInput =
+    input.userStories !== undefined ? input.userStories : parsed.userStoryNumbers.join(",");
+  const userStoryNumbers = parseUserStoryNumbers(userStoriesInput);
   if (!userStoryNumbers.ok) {
     return { ok: false, error: userStoryNumbers.error };
   }
 
-  if (userStoryNumbers.numbers.length > 0 && !input.prd?.trim()) {
+  if (userStoryNumbers.numbers.length > 0 && !prdPublicId) {
     return {
       ok: false,
       error: {
         code: "invalid_input",
-        message: "--user-stories requires --prd",
+        message: "User story references require --prd or a ## PRD markdown section",
       },
     };
   }
 
-  const warnings: OutputWarning[] = [];
-  if (input.prd?.trim()) {
-    const prd = findPrdByPublicId(db, input.prd);
-    if (prd?.status === "archived") {
-      warnings.push({
-        code: "archived_prd",
-        message: `Linked PRD ${prd.publicId} is archived`,
-      });
-    }
-  }
+  const warnings = prdPublicId ? warningsForPrdLink(db, prdPublicId, userStoryNumbers.numbers) : [];
 
   try {
     const issue = withTransaction(db, () =>
       createIssue(db, {
         projectKey: projectKey.key,
         title: input.title,
-        body: input.body,
+        body: bodyMarkdown,
         triageRole: input.triageRole as Issue["triageRole"] | undefined,
         workflowStatus: input.workflowStatus as Issue["workflowStatus"] | undefined,
         complexity: input.complexity as Issue["complexity"] | undefined,
         manualBlocker: input.manualBlocker,
         blockedByPublicIds: input.blockedBy ? [input.blockedBy.trim().toUpperCase()] : undefined,
-        prdPublicId: input.prd,
+        prdPublicId,
         userStoryNumbers: userStoryNumbers.numbers,
       }),
     );
@@ -197,6 +195,9 @@ export function runIssueUpdate(
     complexity?: string;
     manualBlocker?: string;
     clearManualBlocker?: boolean;
+    prd?: string;
+    userStories?: string;
+    clearPrd?: boolean;
   },
 ): CommandResult {
   if (!input.publicId.trim()) {
@@ -233,6 +234,23 @@ export function runIssueUpdate(
     };
   }
 
+  if (input.prd !== undefined && !input.prd.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing value for flag: --prd" },
+    };
+  }
+
+  if (input.clearPrd && (input.prd !== undefined || input.userStories !== undefined)) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: "--clear-prd cannot be combined with --prd or --user-stories",
+      },
+    };
+  }
+
   const issue = findIssueByPublicId(db, input.publicId);
   if (!issue) {
     return {
@@ -247,6 +265,8 @@ export function runIssueUpdate(
   const bodyChanged = input.body !== undefined;
   const bodyMarkdown = bodyChanged ? resolveBodyInput(input.body!) : undefined;
   const parsed = bodyMarkdown ? parseIssueMarkdown(bodyMarkdown) : null;
+  const existingLink = findIssuePrdLinkByIssueId(db, issue.id);
+  const existingPrd = existingLink ? findPrdById(db, existingLink.prdId) : null;
 
   let manualBlocker: string | undefined;
   if (input.clearManualBlocker) {
@@ -256,6 +276,38 @@ export function runIssueUpdate(
   } else if (bodyMarkdown) {
     manualBlocker = parsed?.manualBlockerFromMarkdown?.trim() ?? "";
   }
+
+  const prdPublicId =
+    input.prd?.trim() || (parsed?.prdPublicId ?? undefined) || existingPrd?.publicId;
+  const shouldRelinkPrd =
+    input.prd !== undefined || input.userStories !== undefined || Boolean(parsed?.prdPublicId);
+
+  const userStoriesInput =
+    input.userStories !== undefined
+      ? input.userStories
+      : parsed?.prdPublicId
+        ? parsed.userStoryNumbers.join(",")
+        : existingLink?.userStoryNumbers.join(",");
+  const userStoryNumbers = parseUserStoryNumbers(userStoriesInput);
+  if (!userStoryNumbers.ok) {
+    return { ok: false, error: userStoryNumbers.error };
+  }
+
+  if (shouldRelinkPrd && !prdPublicId) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message:
+          "User story references require --prd, an existing PRD link, or a ## PRD markdown section",
+      },
+    };
+  }
+
+  const warnings =
+    shouldRelinkPrd && prdPublicId
+      ? warningsForPrdLink(db, prdPublicId, userStoryNumbers.numbers)
+      : [];
 
   try {
     const updated = withTransaction(db, () => {
@@ -269,9 +321,14 @@ export function runIssueUpdate(
       if (parsed && bodyMarkdown) {
         addMissingDependenciesFromMarkdown(db, next.publicId, parsed.dependencyPublicIds);
       }
+      if (input.clearPrd) {
+        unlinkIssueFromPrd(db, next.publicId);
+      } else if (shouldRelinkPrd && prdPublicId) {
+        linkIssueToPrd(db, next.publicId, prdPublicId, userStoryNumbers.numbers);
+      }
       return next;
     });
-    return { ok: true, data: issueDetailToOutput(db, updated) };
+    return { ok: true, data: withWarnings(issueDetailToOutput(db, updated), warnings) };
   } catch (error) {
     return repositoryErrorToResult(error);
   }
@@ -340,6 +397,77 @@ export function runIssueUnblockBy(
         error: {
           code: "issue_not_found",
           message: `Issue not found: ${input.publicId}`,
+        },
+      };
+    }
+    return { ok: true, data: issueDetailToOutput(db, issue) };
+  } catch (error) {
+    return repositoryErrorToResult(error);
+  }
+}
+
+export function runIssueLinkPrd(
+  db: Database,
+  input: { publicId: string; prd: string; userStories?: string },
+): CommandResult {
+  if (!input.publicId.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing issue public ID" },
+    };
+  }
+
+  if (!input.prd.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing required flag: --prd" },
+    };
+  }
+
+  const userStoryNumbers = parseUserStoryNumbers(input.userStories);
+  if (!userStoryNumbers.ok) {
+    return { ok: false, error: userStoryNumbers.error };
+  }
+
+  const warnings = warningsForPrdLink(db, input.prd, userStoryNumbers.numbers);
+
+  try {
+    withTransaction(db, () =>
+      linkIssueToPrd(db, input.publicId, input.prd, userStoryNumbers.numbers),
+    );
+    const issue = findIssueByPublicId(db, input.publicId);
+    if (!issue) {
+      return {
+        ok: false,
+        error: {
+          code: "issue_not_found",
+          message: `Issue not found: ${input.publicId}`,
+        },
+      };
+    }
+    return { ok: true, data: withWarnings(issueDetailToOutput(db, issue), warnings) };
+  } catch (error) {
+    return repositoryErrorToResult(error);
+  }
+}
+
+export function runIssueUnlinkPrd(db: Database, publicId: string): CommandResult {
+  if (!publicId.trim()) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "Missing issue public ID" },
+    };
+  }
+
+  try {
+    withTransaction(db, () => unlinkIssueFromPrd(db, publicId));
+    const issue = findIssueByPublicId(db, publicId);
+    if (!issue) {
+      return {
+        ok: false,
+        error: {
+          code: "issue_not_found",
+          message: `Issue not found: ${publicId}`,
         },
       };
     }
@@ -768,8 +896,8 @@ function parseUserStoryNumbers(
   const numbers: number[] = [];
 
   for (const value of values) {
-    const number = Number(value);
-    if (!Number.isSafeInteger(number) || number <= 0) {
+    const range = value.match(/^(\d+)(?:-(\d+))?$/);
+    if (!range) {
       return {
         ok: false,
         error: {
@@ -778,13 +906,64 @@ function parseUserStoryNumbers(
         },
       };
     }
-    if (!seen.has(number)) {
-      seen.add(number);
-      numbers.push(number);
+    const start = Number(range[1]);
+    const end = range[2] ? Number(range[2]) : start;
+    if (
+      !Number.isSafeInteger(start) ||
+      !Number.isSafeInteger(end) ||
+      start <= 0 ||
+      end <= 0 ||
+      end < start
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "invalid_input",
+          message: `Invalid user story reference: ${value}`,
+        },
+      };
+    }
+    for (let number = start; number <= end; number += 1) {
+      if (!seen.has(number)) {
+        seen.add(number);
+        numbers.push(number);
+      }
     }
   }
 
   return { ok: true, numbers };
+}
+
+function warningsForPrdLink(
+  db: Database,
+  prdPublicId: string,
+  userStoryNumbers: number[],
+): OutputWarning[] {
+  const warnings: OutputWarning[] = [];
+  const prd = findPrdByPublicId(db, prdPublicId);
+  if (!prd) {
+    return warnings;
+  }
+
+  if (prd.status === "archived") {
+    warnings.push({
+      code: "archived_prd",
+      message: `Linked PRD ${prd.publicId} is archived`,
+    });
+  }
+
+  const knownStoryNumbers = new Set(
+    extractPrdUserStories(prd.bodyMarkdown).map((story) => story.number),
+  );
+  const missing = userStoryNumbers.filter((number) => !knownStoryNumbers.has(number));
+  if (missing.length > 0) {
+    warnings.push({
+      code: "missing_user_stories",
+      message: `User story references not found in PRD ${prd.publicId}: ${missing.join(", ")}`,
+    });
+  }
+
+  return warnings;
 }
 
 function issueToOutput(db: Database, issue: Issue): Record<string, unknown> {
@@ -862,6 +1041,8 @@ function issueDetailToOutput(db: Database, issue: Issue): Record<string, unknown
     validationSummary: issue.validationSummary,
     parsed: {
       parent: parsed.parent,
+      prdPublicId: parsed.prdPublicId,
+      userStoryNumbers: parsed.userStoryNumbers,
       whatToBuild: parsed.whatToBuild,
       acceptanceCriteria: parsed.acceptanceCriteria,
       blockedByRaw: parsed.blockedByRaw,

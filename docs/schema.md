@@ -205,7 +205,7 @@ Commands that emit PRD or issue data include structured PRD fields so agents do 
 
 `userStories` is extracted from numbered items under the PRD's `User Stories` section when present. Missing or malformed sections produce an empty array; the PRD body remains canonical.
 
-`deck issue create --json`, `deck issue show --json`, queue results, and issue lists include `linkedPrd`:
+`deck issue create --json`, `deck issue show --json`, `deck issue link-prd --json`, `deck issue unlink-prd --json`, queue results, and issue lists include `linkedPrd`:
 
 ```json
 {
@@ -218,7 +218,10 @@ Commands that emit PRD or issue data include structured PRD fields so agents do 
     "status": "active",
     "userStoryNumbers": [3, 7],
     "userStories": [
-      { "number": 3, "text": "As a shopper, I want card errors before submit, so that I can correct them quickly." },
+      {
+        "number": 3,
+        "text": "As a shopper, I want card errors before submit, so that I can correct them quickly."
+      },
       { "number": 7, "text": null }
     ],
     "missingUserStoryNumbers": [7]

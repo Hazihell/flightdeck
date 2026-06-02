@@ -49,9 +49,30 @@ None - can start immediately
 Ship it.
 `);
     expect(parsed.parent).toBeNull();
+    expect(parsed.prdPublicId).toBeNull();
+    expect(parsed.userStoryNumbers).toEqual([]);
     expect(parsed.whatToBuild).toBe("Ship it.");
     expect(parsed.acceptanceCriteria).toEqual([]);
     expect(parsed.blockedByRaw).toBeNull();
+  });
+
+  test("extracts PRD and user story references from optional sections", () => {
+    const parsed = parseIssueMarkdown(`## PRD
+
+prd-prd-1
+
+## User stories
+
+User stories covered: 1-3, 5
+
+## What to build
+
+Build the slice.
+`);
+
+    expect(parsed.prdPublicId).toBe("PRD-PRD-1");
+    expect(parsed.userStoryNumbers).toEqual([1, 2, 3, 5]);
+    expect(parsed.whatToBuild).toBe("Build the slice.");
   });
 
   test("extracts manual blocker text without public IDs", () => {
