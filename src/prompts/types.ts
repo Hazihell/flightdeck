@@ -8,6 +8,16 @@ export function isPromptMode(value: string): value is PromptMode {
   return (PROMPT_MODES as readonly string[]).includes(value);
 }
 
+export type PromptPrdContext = {
+  publicId: string;
+  projectKey: string | null;
+  title: string;
+  status: string;
+  bodyMarkdown: string;
+  coveredUserStories: Array<{ number: number; text: string | null }>;
+  missingUserStoryNumbers: number[];
+};
+
 export type PromptInput = {
   mode: PromptMode;
   publicId: string;
@@ -15,6 +25,7 @@ export type PromptInput = {
   projectName: string;
   projectInstructions: string | null;
   repositoryPath: string | null;
+  linkedPrd: PromptPrdContext | null;
   issueTitle: string;
   issueBodyMarkdown: string;
   acceptanceCriteria: string[];
