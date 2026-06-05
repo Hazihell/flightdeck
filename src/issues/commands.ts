@@ -5,7 +5,7 @@ import { findPrdById, findPrdByPublicId, getProjectKeyForPrd } from "../prds/rep
 import type { CommandResult } from "../projects/commands.ts";
 import { findProjectById, inferProjectFromCwd, listProjectPaths } from "../projects/repository.ts";
 import { generatePrompt } from "../prompts/generator.ts";
-import { isPromptMode, type PromptMode } from "../prompts/types.ts";
+import { isPromptMode, type PromptMode, type PromptPrdContext } from "../prompts/types.ts";
 import { addIssueComment, listIssueComments } from "./comments.ts";
 import { parseIssueMarkdown } from "./markdown.ts";
 import {
@@ -792,6 +792,7 @@ export async function runIssuePrompt(
     projectName: project.name,
     projectInstructions: project.instructions,
     repositoryPath,
+    linkedPrd: resolveLinkedPrd(db, issue)?.context ?? null,
     issueTitle: issue.title,
     issueBodyMarkdown: issue.bodyMarkdown,
     acceptanceCriteria: parsed.acceptanceCriteria,
@@ -994,7 +995,10 @@ function issueSummaryToOutput(db: Database, issue: Issue): Record<string, unknow
   };
 }
 
-function linkedPrdToOutput(db: Database, issue: Issue): Record<string, unknown> | null {
+function resolveLinkedPrd(
+  db: Database,
+  issue: Issue,
+): { context: PromptPrdContext; prdId: string; projectId: string } | null {
   const link = findIssuePrdLinkByIssueId(db, issue.id);
   if (!link) {
     return null;
@@ -1008,21 +1012,45 @@ function linkedPrdToOutput(db: Database, issue: Issue): Record<string, unknown> 
   const storiesByNumber = new Map(
     extractPrdUserStories(prd.bodyMarkdown).map((story) => [story.number, story.text]),
   );
-  const userStories = link.userStoryNumbers.map((number) => ({
+  const coveredUserStories = link.userStoryNumbers.map((number) => ({
     number,
     text: storiesByNumber.get(number) ?? null,
   }));
 
   return {
-    id: prd.id,
-    publicId: prd.publicId,
+    prdId: prd.id,
     projectId: prd.projectId,
-    projectKey: getProjectKeyForPrd(db, prd),
-    title: prd.title,
-    status: prd.status,
-    userStoryNumbers: link.userStoryNumbers,
-    userStories,
-    missingUserStoryNumbers: link.userStoryNumbers.filter((number) => !storiesByNumber.has(number)),
+    context: {
+      publicId: prd.publicId,
+      projectKey: getProjectKeyForPrd(db, prd),
+      title: prd.title,
+      status: prd.status,
+      bodyMarkdown: prd.bodyMarkdown,
+      coveredUserStories,
+      missingUserStoryNumbers: link.userStoryNumbers.filter(
+        (number) => !storiesByNumber.has(number),
+      ),
+    },
+  };
+}
+
+function linkedPrdToOutput(db: Database, issue: Issue): Record<string, unknown> | null {
+  const resolved = resolveLinkedPrd(db, issue);
+  if (!resolved) {
+    return null;
+  }
+
+  const { context, prdId, projectId } = resolved;
+  return {
+    id: prdId,
+    publicId: context.publicId,
+    projectId,
+    projectKey: context.projectKey,
+    title: context.title,
+    status: context.status,
+    userStoryNumbers: context.coveredUserStories.map((s) => s.number),
+    userStories: context.coveredUserStories,
+    missingUserStoryNumbers: context.missingUserStoryNumbers,
   };
 }
 

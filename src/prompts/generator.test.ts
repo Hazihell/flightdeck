@@ -6,6 +6,75 @@ import { normalizePath } from "../projects/paths.ts";
 import { parseDeckJson, runDeck, setupInitializedHome } from "../testing/helpers.ts";
 import { PROMPT_SECTIONS } from "./contracts.ts";
 
+async function setupProjectWithIssueAndPrd() {
+  const isolated = await setupProjectWithIssue();
+
+  await runDeck(
+    [
+      "issue",
+      "create",
+      "--project",
+      "PRM",
+      "--title",
+      "PRD linked issue",
+      "--body",
+      "## What to build\n\nBuild the widget\n\n## Acceptance criteria\n\n- [ ] Tests pass",
+      "--triage-role",
+      "ready-for-agent",
+      "--complexity",
+      "simple",
+      "--json",
+    ],
+    isolated,
+  );
+
+  await runDeck(
+    [
+      "prd",
+      "create",
+      "--project",
+      "PRM",
+      "--title",
+      "Widget PRD",
+      "--body",
+      "## User Stories\n\n1. As a user, I want a widget.\n2. As a user, I want it fast.\n\n## Full detail\n\nThis is the distinctive PRD body line.",
+      "--json",
+    ],
+    isolated,
+  );
+
+  await runDeck(
+    ["issue", "link-prd", "PRM-1", "--prd", "PRM-PRD-1", "--user-stories", "1,2,99", "--json"],
+    isolated,
+  );
+
+  return isolated;
+}
+
+async function captureJsonPromptForIssue(
+  isolated: Awaited<ReturnType<typeof setupProjectWithIssue>>,
+  issueId: string,
+  mode: string,
+): Promise<string> {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    const code = await runDeck(["issue", "prompt", issueId, "--mode", mode, "--json"], isolated);
+    expect(code).toBe(0);
+    const parsed = parseDeckJson<{ prompt?: string }>(lines.join("\n"));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      return parsed.data.prompt ?? "";
+    }
+    return "";
+  } finally {
+    console.log = originalLog;
+  }
+}
+
 async function setupProjectWithIssue() {
   const isolated = await setupInitializedHome();
 
@@ -291,6 +360,66 @@ describe("issue prompts", () => {
     expect(prompt).toContain(PROMPT_SECTIONS.reviewContext);
     expect(prompt).toContain("Add regression coverage for queue overlap");
     expect(prompt).toContain("Please cover the address-review queue case explicitly.");
+  });
+
+  test("linked PRD: all modes include prdContext section with PRD metadata", async () => {
+    const isolated = await setupProjectWithIssueAndPrd();
+
+    for (const mode of ["plan", "implement", "review", "address-review"] as const) {
+      const prompt = await captureJsonPromptForIssue(isolated, "PRM-1", mode);
+      expect(prompt).toContain(PROMPT_SECTIONS.prdContext);
+      expect(prompt).toContain("PRM-PRD-1");
+      expect(prompt).toContain("Widget PRD");
+    }
+  });
+
+  test("linked PRD: covered story text appears for linked numbers", async () => {
+    const isolated = await setupProjectWithIssueAndPrd();
+
+    const prompt = await captureJsonPromptForIssue(isolated, "PRM-1", "plan");
+    expect(prompt).toContain("1. As a user, I want a widget.");
+    expect(prompt).toContain("2. As a user, I want it fast.");
+  });
+
+  test("linked PRD: missing story reference shows missing note", async () => {
+    const isolated = await setupProjectWithIssueAndPrd();
+
+    const prompt = await captureJsonPromptForIssue(isolated, "PRM-1", "plan");
+    expect(prompt).toContain("99. (not found in PRD)");
+    expect(prompt).toContain("Missing user story references: 99 (not found in PRD body)");
+  });
+
+  test("linked PRD: full PRD body is included", async () => {
+    const isolated = await setupProjectWithIssueAndPrd();
+
+    const prompt = await captureJsonPromptForIssue(isolated, "PRM-1", "plan");
+    expect(prompt).toContain("This is the distinctive PRD body line.");
+  });
+
+  test("unlinked issue: prompt does not contain prdContext", async () => {
+    const isolated = await setupProjectWithIssue();
+
+    await runDeck(
+      [
+        "issue",
+        "create",
+        "--project",
+        "PRM",
+        "--title",
+        "No PRD",
+        "--body",
+        "## What to build\n\nOrphan",
+        "--triage-role",
+        "ready-for-agent",
+        "--complexity",
+        "simple",
+        "--json",
+      ],
+      isolated,
+    );
+
+    const prompt = await captureJsonPromptForIssue(isolated, "PRM-1", "plan");
+    expect(prompt).not.toContain(PROMPT_SECTIONS.prdContext);
   });
 
   test("prompt text matches snapshot sections for plan mode", async () => {

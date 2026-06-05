@@ -1,7 +1,10 @@
+import type { PromptPrdContext } from "./types.ts";
+
 /** Stable section headings for snapshot tests and agent parsing. */
 export const PROMPT_SECTIONS = {
   projectContext: "## Project context",
   repositoryPath: "## Repository path",
+  prdContext: "## PRD context",
   issueBody: "## Issue body",
   issuePlan: "## Issue plan",
   acceptanceCriteria: "## Acceptance criteria",
@@ -36,6 +39,44 @@ export function sectionRepositoryPath(path: string | null): string {
       ? path.trim()
       : "(no registered repository path — register one with `deck project path add`)",
   ].join("\n");
+}
+
+export function sectionPrdContext(prd: PromptPrdContext): string {
+  const coveredNumbers =
+    prd.coveredUserStories.length > 0
+      ? prd.coveredUserStories.map((s) => s.number).join(", ")
+      : "none";
+
+  const lines = [
+    PROMPT_SECTIONS.prdContext,
+    "",
+    `- PRD: ${prd.publicId} — ${prd.title}`,
+    `- Status: ${prd.status}`,
+    `- Project key: ${prd.projectKey ?? "(none)"}`,
+    `- Covered user stories: ${coveredNumbers}`,
+  ];
+
+  if (prd.coveredUserStories.length > 0) {
+    lines.push("", "### Covered user stories", "");
+    for (const story of prd.coveredUserStories) {
+      if (story.text !== null) {
+        lines.push(`- ${story.number}. ${story.text}`);
+      } else {
+        lines.push(`- ${story.number}. (not found in PRD)`);
+      }
+    }
+  }
+
+  if (prd.missingUserStoryNumbers.length > 0) {
+    lines.push(
+      "",
+      `- Missing user story references: ${prd.missingUserStoryNumbers.join(", ")} (not found in PRD body)`,
+    );
+  }
+
+  lines.push("", "### Full PRD", "", prd.bodyMarkdown.trim());
+
+  return lines.join("\n");
 }
 
 export function sectionIssueBody(bodyMarkdown: string): string {

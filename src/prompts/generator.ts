@@ -4,6 +4,7 @@ import {
   sectionIssueBody,
   sectionIssuePlan,
   sectionModeInstructions,
+  sectionPrdContext,
   sectionProjectContext,
   sectionRepositoryPath,
   sectionRequiredCommands,
@@ -114,6 +115,7 @@ export function generatePrompt(input: PromptInput): PromptOutput {
   const sections = [
     sectionProjectContext(input.projectKey, input.projectName, input.projectInstructions),
     sectionRepositoryPath(input.repositoryPath),
+    input.linkedPrd ? sectionPrdContext(input.linkedPrd) : "",
     sectionIssueBody(input.issueBodyMarkdown),
     includePlan(input.mode, input) ? sectionIssuePlan(input.planContent) : "",
     sectionAcceptanceCriteria(input.acceptanceCriteria),
