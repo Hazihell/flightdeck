@@ -12,6 +12,7 @@ import { parseDeckJson, runDeck, setupInitializedHome, spawnDeckJson } from "./t
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "testing", "fixtures");
 const ISSUE_PATH = join(FIXTURES, "issue.md");
 const PLAN_PATH = join(FIXTURES, "plan.md");
+const PRD_PATH = join(FIXTURES, "prd.md");
 
 describe("end-to-end workflow", () => {
   test("init through project, issue, plan, implement, review, and done", async () => {
@@ -307,5 +308,144 @@ describe("end-to-end workflow", () => {
     } finally {
       console.log = originalLog;
     }
+  });
+
+  test("PRD-backed flow: create PRD, link slices in dependency order, and trace context", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+
+    expect(
+      await runDeck(["project", "add", "--key", "FLOW", "--name", "Flow App", "--json"], isolated),
+    ).toBe(0);
+
+    // to-prd: import a markdown PRD file into Flightdeck.
+    const prdCreate = spawnDeckJson<{
+      publicId: string;
+      userStories: Array<{ number: number }>;
+    }>(
+      ["prd", "create", "--project", "FLOW", "--title", "Greeting experience", "--body", PRD_PATH],
+      env,
+    );
+    expect(prdCreate.exitCode).toBe(0);
+    if (!prdCreate.response.ok) {
+      throw new Error(prdCreate.response.error.message);
+    }
+    const prdId = prdCreate.response.data.publicId;
+    expect(prdId).toBe("FLOW-PRD-1");
+    expect(prdCreate.response.data.userStories.map((story) => story.number)).toEqual([1, 2, 3]);
+
+    // to-issues: create linked vertical slices in dependency order.
+    const slice1 = spawnDeckJson<{ publicId: string }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "FLOW",
+        "--title",
+        "Render greeting banner",
+        "--body",
+        "# Render greeting banner",
+        "--triage-role",
+        "ready-for-agent",
+        "--complexity",
+        "simple",
+        "--prd",
+        prdId,
+        "--user-stories",
+        "1,2",
+      ],
+      env,
+    );
+    expect(slice1.exitCode).toBe(0);
+    if (!slice1.response.ok) {
+      throw new Error(slice1.response.error.message);
+    }
+    expect(slice1.response.data.publicId).toBe("FLOW-1");
+
+    const slice2 = spawnDeckJson<{ publicId: string }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "FLOW",
+        "--title",
+        "Dismiss greeting banner",
+        "--body",
+        "# Dismiss greeting banner",
+        "--triage-role",
+        "ready-for-agent",
+        "--complexity",
+        "simple",
+        "--prd",
+        prdId,
+        "--user-stories",
+        "3",
+        "--blocked-by",
+        "FLOW-1",
+      ],
+      env,
+    );
+    expect(slice2.exitCode).toBe(0);
+    if (!slice2.response.ok) {
+      throw new Error(slice2.response.error.message);
+    }
+    expect(slice2.response.data.publicId).toBe("FLOW-2");
+
+    // PRD JSON exposes extracted user stories and linked issues.
+    const prdShow = spawnDeckJson<{
+      userStories: Array<{ number: number }>;
+      linkedIssues: Array<{ publicId: string; userStoryNumbers: number[] }>;
+    }>(["prd", "show", prdId], env);
+    expect(prdShow.exitCode).toBe(0);
+    if (!prdShow.response.ok) {
+      throw new Error(prdShow.response.error.message);
+    }
+    expect(prdShow.response.data.userStories.map((story) => story.number)).toEqual([1, 2, 3]);
+    expect(prdShow.response.data.linkedIssues.map((issue) => issue.publicId)).toEqual([
+      "FLOW-1",
+      "FLOW-2",
+    ]);
+    expect(prdShow.response.data.linkedIssues.map((issue) => issue.userStoryNumbers)).toEqual([
+      [1, 2],
+      [3],
+    ]);
+
+    // Issue JSON exposes linked PRD metadata and user story references.
+    const issueShow = spawnDeckJson<{
+      linkedPrd: { publicId: string; title: string; userStoryNumbers: number[] } | null;
+    }>(["issue", "show", "FLOW-2"], env);
+    expect(issueShow.exitCode).toBe(0);
+    if (!issueShow.response.ok) {
+      throw new Error(issueShow.response.error.message);
+    }
+    expect(issueShow.response.data.linkedPrd?.publicId).toBe(prdId);
+    expect(issueShow.response.data.linkedPrd?.title).toBe("Greeting experience");
+    expect(issueShow.response.data.linkedPrd?.userStoryNumbers).toEqual([3]);
+
+    // Generated prompt for a linked issue includes the PRD context section.
+    const prompt = spawnDeckJson<{ prompt: string }>(
+      ["issue", "prompt", "FLOW-2", "--mode", "implement"],
+      env,
+    );
+    expect(prompt.exitCode).toBe(0);
+    if (!prompt.response.ok) {
+      throw new Error(prompt.response.error.message);
+    }
+    expect(prompt.response.data.prompt).toContain("## PRD context");
+    expect(prompt.response.data.prompt).toContain(prdId);
+    expect(prompt.response.data.prompt).toContain("Greeting experience");
+    expect(prompt.response.data.prompt).toContain("Covered user stories");
+    expect(prompt.response.data.prompt).toContain("## Problem Statement");
+
+    // Dependency order: the blocked slice is not selected before its blocker.
+    const implementNext = spawnDeckJson<{ issue: { publicId: string } | null }>(
+      ["issue", "next", "--mode", "implement", "--project", "FLOW"],
+      env,
+    );
+    expect(implementNext.exitCode).toBe(0);
+    if (!implementNext.response.ok) {
+      throw new Error(implementNext.response.error.message);
+    }
+    expect(implementNext.response.data.issue?.publicId).toBe("FLOW-1");
   });
 });

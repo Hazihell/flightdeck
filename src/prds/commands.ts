@@ -1,5 +1,6 @@
 import type { Database } from "../db/client.ts";
 import { withTransaction } from "../db/client.ts";
+import { listIssuesLinkedToPrd } from "../issues/repository.ts";
 import type { CommandResult } from "../projects/commands.ts";
 import { inferProjectFromCwd } from "../projects/repository.ts";
 import { extractPrdUserStories } from "./markdown.ts";
@@ -222,6 +223,13 @@ function prdToOutput(db: Database, prd: Prd): Record<string, unknown> {
     status: prd.status,
     bodyMarkdown: prd.bodyMarkdown,
     userStories: extractPrdUserStories(prd.bodyMarkdown),
+    linkedIssues: listIssuesLinkedToPrd(db, prd.id).map(({ issue, userStoryNumbers }) => ({
+      id: issue.id,
+      publicId: issue.publicId,
+      title: issue.title,
+      workflowStatus: issue.workflowStatus,
+      userStoryNumbers,
+    })),
     createdAt: prd.createdAt,
     updatedAt: prd.updatedAt,
   };

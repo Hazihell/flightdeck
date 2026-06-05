@@ -32,9 +32,11 @@ describe("skill commands", () => {
     expect(content).toContain("deck issue next --mode plan|implement|review|address-review");
     expect(content).toContain("to-prd");
     expect(content).toContain("to-issues");
+    expect(content).toContain("import a markdown PRD file");
     expect(content).toContain("deck prd create --project <KEY>");
     expect(content).toContain("--prd <PRD_ID> --user-stories 1,3");
     expect(content).toContain("PRD link: product context and user story traceability");
+    expect(content).toContain("`Parent`: issue hierarchy or source grouping only");
     expect(content).not.toContain("create one parent issue");
     expect(content).toContain("GitHub/Gitea/Jira/Linear/Obsidian");
   });

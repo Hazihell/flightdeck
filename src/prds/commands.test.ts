@@ -326,4 +326,83 @@ describe("prd commands", () => {
       expect(list.response.data.count).toBe(1);
     }
   });
+
+  test("exposes linked issues with user story references in PRD output", async () => {
+    const isolated = await setupInitializedHome();
+    const { env } = isolated;
+    const db = openDatabase(env.FLIGHTDECK_HOME!);
+    try {
+      createProject(db, { key: "LNK", name: "Linked" });
+    } finally {
+      closeDatabase(db);
+    }
+
+    const body = `# Linked PRD
+
+## User Stories
+
+1. As a user, I want a banner, so that the app feels welcoming.
+2. As a user, I want the project name shown, so that context is clear.
+`;
+    const created = spawnDeckJson<{ publicId: string }>(
+      ["prd", "create", "--project", "LNK", "--title", "Linked PRD", "--body", body],
+      env,
+    );
+    expect(created.response.ok).toBe(true);
+    const prdId = created.response.ok ? created.response.data.publicId : "";
+
+    const first = spawnDeckJson<{ publicId: string }>(
+      [
+        "issue",
+        "create",
+        "--project",
+        "LNK",
+        "--title",
+        "Render banner",
+        "--body",
+        "# Render banner",
+        "--prd",
+        prdId,
+        "--user-stories",
+        "1",
+      ],
+      env,
+    );
+    expect(first.response.ok).toBe(true);
+    spawnDeckJson(
+      [
+        "issue",
+        "create",
+        "--project",
+        "LNK",
+        "--title",
+        "Show project name",
+        "--body",
+        "# Show project name",
+        "--prd",
+        prdId,
+        "--user-stories",
+        "2",
+      ],
+      env,
+    );
+
+    const shown = spawnDeckJson<{
+      userStories: Array<{ number: number }>;
+      linkedIssues: Array<{ publicId: string; title: string; userStoryNumbers: number[] }>;
+    }>(["prd", "show", prdId], env);
+    expect(shown.exitCode).toBe(0);
+    expect(shown.response.ok).toBe(true);
+    if (shown.response.ok) {
+      expect(shown.response.data.userStories.map((story) => story.number)).toEqual([1, 2]);
+      expect(shown.response.data.linkedIssues.map((issue) => issue.publicId)).toEqual([
+        "LNK-1",
+        "LNK-2",
+      ]);
+      expect(shown.response.data.linkedIssues.map((issue) => issue.userStoryNumbers)).toEqual([
+        [1],
+        [2],
+      ]);
+    }
+  });
 });

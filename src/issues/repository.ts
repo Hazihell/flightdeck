@@ -523,6 +523,28 @@ export function findIssuePrdLinkByIssueId(db: Database, issueId: string): IssueP
   return row ? mapIssuePrdLink(row) : null;
 }
 
+export type LinkedIssueForPrd = {
+  issue: Issue;
+  userStoryNumbers: number[];
+};
+
+/** Lists issues linked to a PRD, in dependency-friendly sequence order. */
+export function listIssuesLinkedToPrd(db: Database, prdId: string): LinkedIssueForPrd[] {
+  const rows = db
+    .query<IssueRow & { user_story_refs: string }, [string]>(
+      `SELECT issues.*, issue_prd_links.user_story_refs AS user_story_refs
+       FROM issue_prd_links
+       JOIN issues ON issues.id = issue_prd_links.issue_id
+       WHERE issue_prd_links.prd_id = ?
+       ORDER BY issues.sequence ASC`,
+    )
+    .all(prdId);
+  return rows.map((row) => ({
+    issue: mapIssue(row),
+    userStoryNumbers: parseStoredUserStoryRefs(row.user_story_refs),
+  }));
+}
+
 export function listAllIssues(db: Database): Issue[] {
   const rows = db
     .query<IssueRow, []>("SELECT * FROM issues ORDER BY project_id ASC, sequence ASC")
